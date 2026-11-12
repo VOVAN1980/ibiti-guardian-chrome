@@ -3,8 +3,12 @@
 Know what you sign. Guardian holds a wallet request before it reaches your
 wallet, shows what it would allow in plain facts, and lets you reject it.
 
+**Try it without installing anything: https://ibiti-guardian-chrome.web.app**
+(a simulation with a demo wallet that has no keys and no funds; the extension
+does the same check in front of your real wallet).
+
 Status: work in progress for #BuildHybridAI 2026. Interception, the fact
-analyzer, the hybrid AI explanation and the no-install demo are in place.
+analyzer, the hybrid AI explanation and the hosted demo are in place.
 
 ## How the AI is used
 
@@ -48,7 +52,15 @@ the extension is not installed, the page loads the very same in-page guard
 page. It is a preview, not protection: a panel inside a page can be removed by
 that page, which is why the extension opens its own window instead. The App
 Check debug token is never written into the site; the build fails if it finds
-it there.
+it there. The hosted site proves itself to App Check with reCAPTCHA
+Enterprise instead.
+
+```bash
+npm run deploy:site                                       # build, test, publish
+SITE_URL=https://ibiti-guardian-chrome.web.app node test/site.mjs           # check the live site
+SITE_URL=https://ibiti-guardian-chrome.web.app PHONE=1 node test/site.mjs   # on a phone screen
+node test/cloud-live.mjs                                  # live cloud analysis via App Check
+```
 
 ## Tests
 
