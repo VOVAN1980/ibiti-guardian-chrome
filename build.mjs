@@ -79,6 +79,13 @@ await build({ ...web, entryPoints: ['src/inpage.js', 'src/web/panel.js'], entryN
 await build({ ...web, entryPoints: ['src/review.js'], format: 'esm' });
 await rm(siteConfigPath, { force: true });
 
+// The published page only ever uses the demo wallet (see demo/dapp.js).
+const sitePage = path.join(site, 'index.html');
+const marker = '<!-- playground:public -->';
+const html = await readFile(sitePage, 'utf8');
+if (!html.includes(marker)) throw new Error('index.html: public marker missing');
+await writeFile(sitePage, html.replace(marker, '<script>window.__playgroundPublic = true;</script>'));
+
 // A last check before anything can be published: the debug token must not be
 // anywhere in the public site.
 if (!keepDebugToken && config.appCheckDebugToken) {
