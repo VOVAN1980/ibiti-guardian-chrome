@@ -124,6 +124,7 @@ function currentWallet() {
 
 const isDemo = (wallet) => Boolean(wallet) && wallet.info.rdns === DEMO_WALLET;
 let shown = null; // the wallet the controls below were last drawn for
+let SIM_TEXT = null; // the page's own "Simulation" note, kept to restore it
 
 function renderWallets() {
   state.wallets = Array.from(wallets.values(), (w) => w.info.rdns);
@@ -139,6 +140,27 @@ function renderWallets() {
   pickEl.hidden = PUBLIC || wallets.size < 2;
   state.wallet = current ? current.info.rdns : null;
   document.getElementById('wallet-section').hidden = PUBLIC;
+
+  // Say plainly which wallet this page is talking to: the "Simulation" note
+  // is true only for the demo wallet.
+  const simEl = document.getElementById('sim');
+  const simText = document.getElementById('sim-text');
+  if (!SIM_TEXT) SIM_TEXT = Array.from(simText.childNodes, (node) => node.cloneNode(true));
+  if (current && !isDemo(current)) {
+    simEl.dataset.real = '';
+    simText.replaceChildren();
+    const title = document.createElement('b');
+    title.textContent = 'Real wallet test (local page).';
+    simText.append(
+      title,
+      ` This page is talking to ${current.info.name}, not to the demo wallet. It sends requests only while the wallet is on a test network. In the wallet, always press Reject: these are examples of what not to sign.`,
+    );
+    document.title = `Guardian local test: ${current.info.name}`;
+  } else if (simEl.dataset.real !== undefined) {
+    delete simEl.dataset.real;
+    simText.replaceChildren(...SIM_TEXT.map((node) => node.cloneNode(true)));
+    document.title = 'IBITI Guardian playground';
+  }
 
   // The demo wallet needs no connecting and has no networks to switch.
   document.getElementById('connect').hidden = isDemo(current);
