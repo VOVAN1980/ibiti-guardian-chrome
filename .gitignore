@@ -6,3 +6,6 @@ src/config.js
 
 # Firebase CLI deploy cache
 .firebase/
+
+# Video working files (script, recordings)
+video/
