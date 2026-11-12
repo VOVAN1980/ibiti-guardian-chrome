@@ -30,6 +30,9 @@
   const setRepeating = setInterval;
   const doc = document;
 
+  // Where a guarded provider keeps its read-only call helper.
+  const CALL = Symbol('ibitiGuardianCall');
+
   const REVIEWED = new Set([
     'eth_sendTransaction',
     'eth_signTypedData',
@@ -255,85 +258,221 @@
   }
 
   // ── Wrapping providers ─────────────────────────────────────────────────
-  const guarded = new WeakSet();
+  // Some wallets replace their own request() after they are created
+  // (TronLink does), which would silently drop a one-time wrapper. Each
+  // guarded method is therefore an accessor: reading it always gives the
+  // wrapper, and assigning a new function only changes what the wrapper
+  // calls. Known providers are also re-checked, in case a wallet redefines
+  // the property outright.
+  const wrappers = new WeakSet();
+  const known = [];
+
+  /**
+   * Calls the wallet's current implementation. If that implementation leads
+   * straight back into the wrapper (a wallet re-binding the method it just
+   * read, i.e. the wrapper itself), the inner call goes to the last
+   * implementation known not to loop.
+   */
+  function through(state, self, args) {
+    if (state.depth > 0) {
+      state.reentered = true;
+      return apply(state.base, self, args);
+    }
+    state.depth++;
+    state.reentered = false;
+    try {
+      return apply(state.target, self, args);
+    } finally {
+      state.depth--;
+      if (!state.reentered) state.base = state.target;
+    }
+  }
+
+  /**
+   * A private copy of what the page passed. The page keeps its own object and
+   * could change it while the user is reading the review, or use a getter
+   * that answers differently each time. Guardian reviews the copy and the
+   * wallet receives a copy, so what was reviewed is what gets signed.
+   * Returns null for anything that is not plain JSON data.
+   */
+  function snapshotOf(value) {
+    try {
+      const text = stringify(value);
+      if (typeof text !== 'string') return null;
+      return { text, value: parse(text) };
+    } catch {
+      return null;
+    }
+  }
+
+  // Requests the user has just allowed, while they travel down to the wallet.
+  // If another wrapper sits in between and hands the same request to an inner
+  // Guardian wrapper, it is not reviewed a second time. Entries live only for
+  // the synchronous call and match by exact content.
+  const allowedNow = new Map();
+
+  function passAllowed(text, run) {
+    allowedNow.set(text, (allowedNow.get(text) || 0) + 1);
+    try {
+      return run();
+    } finally {
+      const left = (allowedNow.get(text) || 1) - 1;
+      if (left > 0) allowedNow.set(text, left);
+      else allowedNow.delete(text);
+    }
+  }
+
+  function invalidRequest() {
+    const error = new Error('IBITI Guardian: this request is not plain data, so it could not be reviewed.');
+    error.code = -32600; // JSON-RPC invalid request
+    return error;
+  }
 
   function guard(provider) {
     if (!provider || (typeof provider !== 'object' && typeof provider !== 'function')) return;
-    if (guarded.has(provider)) return;
-    const original = provider.request;
-    if (typeof original !== 'function') return;
-    guarded.add(provider);
+    let current;
+    try {
+      current = provider.request;
+    } catch {
+      return;
+    }
+    if (typeof current !== 'function') return;
+    if (known.indexOf(provider) === -1) known.push(provider);
 
-    const call = (args) => apply(original, provider, [args]);
+    if (!wrappers.has(current)) {
+      const state = { target: current, base: current, depth: 0, reentered: false };
+      // Read-only calls for context use the wallet's own request().
+      const call = (args) => through(state, provider, [args]);
+      const wrapper = function request(args) {
+        const self = this === undefined ? provider : this;
+        if (state.depth > 0) return through(state, self, arguments);
 
-    const request = function request(args) {
-      const method = args && typeof args === 'object' ? args.method : undefined;
-      if (typeof method !== 'string' || !REVIEWED.has(method)) {
-        return apply(original, this === undefined ? provider : this, arguments);
+        const snap = snapshotOf(args);
+        if (!snap || !snap.value || typeof snap.value !== 'object') {
+          return PromiseCtor.reject(invalidRequest());
+        }
+        const method = snap.value.method;
+        if (typeof method !== 'string' || !REVIEWED.has(method)) {
+          return through(state, self, [snap.value]);
+        }
+        if (allowedNow.has(snap.text)) return through(state, self, [snap.value]);
+
+        return review(call, method, snap.value.params).then((decision) => {
+          if (decision !== 'allow') throw rejection(decision);
+          // A fresh copy for the wallet: the reviewed one was shown to the user.
+          return passAllowed(snap.text, () => through(state, self, [parse(snap.text)]));
+        });
+      };
+      install(provider, 'request', wrapper, state);
+      provider[CALL] = call;
+    }
+
+    const call = provider[CALL];
+    if (typeof call !== 'function') return;
+
+    for (const name of ['send', 'sendAsync']) {
+      let legacy;
+      try {
+        legacy = provider[name];
+      } catch {
+        continue;
       }
-      const self = this === undefined ? provider : this;
-      const rawArgs = arguments;
-      return review(call, method, args.params).then((decision) => {
-        if (decision === 'allow') return apply(original, self, rawArgs);
-        throw rejection(decision);
-      });
-    };
-
-    const legacy = (name) => {
-      const originalLegacy = provider[name];
-      if (typeof originalLegacy !== 'function') return;
+      if (typeof legacy !== 'function' || wrappers.has(legacy)) continue;
+      const state = { target: legacy, base: legacy, depth: 0, reentered: false };
       const wrapper = function (first, second) {
         const self = this === undefined ? provider : this;
-        const rawArgs = arguments;
+        if (state.depth > 0) return through(state, self, arguments);
+
         // send(method, params) → Promise
         if (typeof first === 'string') {
-          if (!REVIEWED.has(first)) return apply(originalLegacy, self, rawArgs);
-          return review(call, first, second).then((decision) => {
-            if (decision === 'allow') return apply(originalLegacy, self, rawArgs);
-            throw rejection(decision);
+          if (!REVIEWED.has(first)) return through(state, self, arguments);
+          const snap = snapshotOf(second === undefined ? [] : second);
+          if (!snap) return PromiseCtor.reject(invalidRequest());
+          const text = `${first}:${snap.text}`;
+          if (allowedNow.has(text)) return through(state, self, [first, snap.value]);
+          return review(call, first, snap.value).then((decision) => {
+            if (decision !== 'allow') throw rejection(decision);
+            return passAllowed(text, () => through(state, self, [first, parse(snap.text)]));
           });
         }
-        // send(payload, callback) / sendAsync(payload, callback)
-        if (first && typeof first === 'object' && !Array.isArray(first) && REVIEWED.has(first.method)) {
-          if (typeof second !== 'function') {
-            throw rejection('error'); // synchronous signing is not reviewable
-          }
-          review(call, first.method, first.params).then((decision) => {
-            if (decision === 'allow') apply(originalLegacy, self, rawArgs);
-            else second(rejection(decision), null);
-          });
-          return undefined;
-        }
-        return apply(originalLegacy, self, rawArgs);
-      };
-      define(provider, name, wrapper);
-    };
 
-    define(provider, 'request', request);
-    legacy('send');
-    legacy('sendAsync');
+        // send(payload, callback) / sendAsync(payload, callback)
+        const snap = snapshotOf(first);
+        if (!snap || !snap.value || typeof snap.value !== 'object') {
+          return through(state, self, arguments);
+        }
+        const batch = Array.isArray(snap.value) ? snap.value : null;
+        const reviewed = batch
+          ? batch.some((item) => item && REVIEWED.has(item.method))
+          : REVIEWED.has(snap.value.method);
+        if (!reviewed) {
+          return typeof second === 'function'
+            ? through(state, self, [snap.value, second])
+            : through(state, self, [snap.value]);
+        }
+        // Batches and synchronous signing cannot be shown one by one: refuse.
+        if (batch || typeof second !== 'function') {
+          if (typeof second === 'function') {
+            second(rejection('error'), null);
+            return undefined;
+          }
+          throw rejection('error');
+        }
+        if (allowedNow.has(snap.text)) return through(state, self, [snap.value, second]);
+        review(call, snap.value.method, snap.value.params).then((decision) => {
+          if (decision !== 'allow') {
+            second(rejection(decision), null);
+            return;
+          }
+          passAllowed(snap.text, () => through(state, self, [parse(snap.text), second]));
+        });
+        return undefined;
+      };
+      install(provider, name, wrapper, state);
+    }
   }
 
-  function define(target, name, value) {
+  function install(provider, name, wrapper, state) {
+    wrappers.add(wrapper);
     try {
-      Object.defineProperty(target, name, { value, configurable: true, writable: true });
+      Object.defineProperty(provider, name, {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return wrapper;
+        },
+        set(next) {
+          // The wallet swapped its implementation: keep guarding the new one.
+          if (typeof next === 'function' && !wrappers.has(next)) state.target = next;
+        },
+      });
     } catch {
       try {
-        target[name] = value;
+        provider[name] = wrapper;
       } catch {
         // Frozen provider: cannot be wrapped.
       }
     }
   }
 
+  function guardKnown() {
+    for (let i = 0; i < known.length; i++) guard(known[i]);
+  }
+
   function guardGlobal() {
     try {
       const provider = window.ethereum;
-      if (!provider) return;
-      guard(provider);
-      if (Array.isArray(provider.providers)) provider.providers.forEach(guard);
+      if (provider) {
+        guard(provider);
+        if (Array.isArray(provider.providers)) provider.providers.forEach(guard);
+      }
     } catch {
       // A hostile getter on window.ethereum must not break the page.
+    }
+    try {
+      guardKnown();
+    } catch {
+      // keep the page working
     }
   }
 
@@ -389,5 +528,5 @@
   apply(addListener, doc, ['DOMContentLoaded', guardGlobal]);
   apply(addListener, window, ['load', guardGlobal]);
   for (const delay of [0, 50, 150, 400, 1000, 2500, 5000]) setTimer(guardGlobal, delay);
-  setRepeating(guardGlobal, 2000);
+  setRepeating(guardGlobal, 1000);
 })();

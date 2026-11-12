@@ -67,7 +67,56 @@ const SCENARIOS = {
 };
 
 const logEl = document.getElementById('log');
-const state = (window.__dapp = { last: null, history: [] });
+const state = (window.__dapp = { last: null, history: [], wallets: [] });
+
+// ── Which wallet ───────────────────────────────────────────────────────────
+// With several wallets installed, window.ethereum belongs to whichever one
+// grabbed it last. Modern sites ask every wallet to introduce itself
+// (EIP-6963) and let the person choose; this page does the same.
+const wallets = new Map(); // rdns → { info, provider }
+const pickEl = document.getElementById('pick');
+const walletEl = document.getElementById('wallet');
+let chosen = null; // rdns chosen by the person, if any
+
+function currentWallet() {
+  if (chosen && wallets.has(chosen)) return wallets.get(chosen);
+  const demo = wallets.get('dev.ibiti.demo-wallet');
+  if (demo) return demo;
+  const metamask = wallets.get('io.metamask');
+  if (metamask) return metamask;
+  const first = wallets.values().next().value;
+  if (first) return first;
+  return window.ethereum ? { info: { name: 'Browser wallet', rdns: '' }, provider: window.ethereum } : null;
+}
+
+function renderWallets() {
+  state.wallets = Array.from(wallets.values(), (w) => w.info.rdns);
+  const current = currentWallet();
+  pickEl.replaceChildren();
+  for (const { info } of wallets.values()) {
+    const option = document.createElement('option');
+    option.value = info.rdns;
+    option.textContent = info.name;
+    option.selected = Boolean(current) && current.info.rdns === info.rdns;
+    pickEl.append(option);
+  }
+  pickEl.hidden = wallets.size < 2;
+  state.wallet = current ? current.info.rdns : null;
+}
+
+window.addEventListener('eip6963:announceProvider', (event) => {
+  const detail = event.detail;
+  if (!detail || !detail.info || !detail.provider || typeof detail.info.rdns !== 'string') return;
+  wallets.set(detail.info.rdns, { info: detail.info, provider: detail.provider });
+  renderWallets();
+});
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+pickEl.addEventListener('change', () => {
+  chosen = pickEl.value;
+  renderWallets();
+  walletEl.textContent = 'Not connected.';
+});
 
 function report(entry) {
   state.last = entry;
@@ -81,11 +130,12 @@ function report(entry) {
 }
 
 async function run(scenario) {
-  const provider = window.ethereum;
-  if (!provider) {
+  const wallet = currentWallet();
+  if (!wallet) {
     report({ scenario, ok: false, message: 'No wallet found. Open this page with ?mock=1 to use the demo wallet.' });
     return;
   }
+  const provider = wallet.provider;
   try {
     const request = SCENARIOS[scenario]();
     state.sent = JSON.parse(JSON.stringify(request)); // what the site asked for
@@ -101,29 +151,33 @@ for (const button of document.querySelectorAll('[data-scenario]')) {
 }
 
 // ── Real wallets: connect first, and prefer a test network ────────────────
-const walletEl = document.getElementById('wallet');
+
+const CHAIN_NAMES = { 1: 'Ethereum mainnet', 11155111: 'Sepolia test network' };
 
 async function connect() {
-  const provider = window.ethereum;
-  if (!provider) {
+  const wallet = currentWallet();
+  if (!wallet) {
     walletEl.textContent = 'No wallet found. Add ?mock=1 to the address to use the demo wallet.';
     return;
   }
+  const provider = wallet.provider;
   try {
     const accounts = await provider.request({ method: 'eth_requestAccounts' });
     if (accounts && accounts[0]) ME = accounts[0];
-    const chainId = await provider.request({ method: 'eth_chainId' });
-    walletEl.textContent = `Connected: ${ME.slice(0, 6)}…${ME.slice(-4)} on chain ${parseInt(chainId, 16)}${provider.isMockWallet ? ' (demo wallet)' : ''}`;
+    const chainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
+    walletEl.textContent = `Connected with ${wallet.info.name}: ${ME.slice(0, 6)}…${ME.slice(-4)} on ${CHAIN_NAMES[chainId] || `chain ${chainId}`}`;
     state.account = ME;
-    state.chainId = parseInt(chainId, 16);
+    state.chainId = chainId;
   } catch (error) {
     walletEl.textContent = `Not connected: ${String((error && error.message) || error)}`;
   }
 }
 
 async function useTestnet() {
+  const wallet = currentWallet();
+  if (!wallet) return;
   try {
-    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+    await wallet.provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
     await connect();
   } catch (error) {
     walletEl.textContent = `Could not switch network: ${String((error && error.message) || error)}`;
@@ -132,4 +186,5 @@ async function useTestnet() {
 
 document.getElementById('connect').addEventListener('click', connect);
 document.getElementById('testnet').addEventListener('click', useTestnet);
+renderWallets();
 if (window.ethereum && window.ethereum.isMockWallet) connect();

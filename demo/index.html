@@ -13,6 +13,7 @@
       .hero { padding: 26px; border-radius: 18px; background: #171b25; border: 1px solid #262d3b; margin-bottom: 26px; }
       button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 12px; border: 1px solid #2c3546; background: #1b2130; color: #f2f4f8; padding: 11px 16px; }
       button:hover { background: #232b3d; }
+      select { font: inherit; font-weight: 600; border-radius: 12px; border: 1px solid #2c3546; background: #1b2130; color: #f2f4f8; padding: 11px 12px; }
       button.cta { background: #19d3e6; color: #06131a; border-color: transparent; font-size: 17px; padding: 14px 26px; }
       h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #6f7b8c; margin: 0 0 10px; }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-bottom: 26px; }
@@ -34,6 +35,7 @@
 
       <h2>Wallet</h2>
       <div class="grid">
+        <select id="pick" aria-label="Wallet to use" hidden></select>
         <button id="connect">Connect wallet</button>
         <button id="testnet">Switch to Sepolia test network</button>
       </div>

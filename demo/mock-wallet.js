@@ -61,11 +61,45 @@
           throw Object.assign(new Error(`Mock wallet: unsupported method ${method}`), { code: 4200 });
       }
     },
+    // Legacy entry points that older sites still call.
+    sendAsync(payload, callback) {
+      provider.request(payload).then(
+        (result) => callback(null, { id: payload.id, jsonrpc: '2.0', result }),
+        (error) => callback(error, null),
+      );
+    },
+    send(first, second) {
+      if (typeof first === 'string') return provider.request({ method: first, params: second || [] });
+      return provider.sendAsync(first, second);
+    },
     on() {},
     removeListener() {},
   };
 
   window.ethereum = provider;
+
+  // Some real wallets replace request() after start-up. With ?swap=1 the demo
+  // wallet does the same, both by assignment and by redefining the property,
+  // to prove that Guardian keeps guarding the new function.
+  const swapMode = new URLSearchParams(location.search).get('swap');
+  if (swapMode) {
+    setTimeout(() => {
+      const inner = provider.request;
+      const replacement = function request(args) {
+        window.__mockWalletSwapped = true;
+        return inner.call(provider, args);
+      };
+      if (swapMode === 'define') {
+        Object.defineProperty(provider, 'request', { value: replacement, writable: true, configurable: true });
+      } else if (swapMode === 'rebind') {
+        // Reads the method (already Guardian's wrapper) and assigns it back bound.
+        provider.request = provider.request.bind(provider);
+      } else {
+        provider.request = replacement;
+      }
+      window.__mockWalletSwapDone = true;
+    }, 300);
+  }
 
   const announce = () =>
     window.dispatchEvent(
