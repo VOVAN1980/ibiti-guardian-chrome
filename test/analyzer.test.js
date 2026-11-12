@@ -164,12 +164,12 @@ test('personal_sign of binary data is caution', () => {
 });
 
 test('sign-in message for another domain is danger', () => {
-  const text = 'opensea.io wants you to sign in with your Ethereum account:\n' + ME + '\n\nNonce: 1';
+  const text = 'nft-market.example wants you to sign in with your Ethereum account:\n' + ME + '\n\nNonce: 1';
   const hex = '0x' + Buffer.from(text, 'utf8').toString('hex');
   const bad = analyze({ method: 'personal_sign', params: [hex, ME], origin: 'https://free-airdrop.example' });
   assert.equal(bad.kind, 'signIn');
   assert.equal(bad.risk, 'danger');
-  const ok = analyze({ method: 'personal_sign', params: [hex, ME], origin: 'https://opensea.io' });
+  const ok = analyze({ method: 'personal_sign', params: [hex, ME], origin: 'https://nft-market.example' });
   assert.equal(ok.risk, 'info');
 });
 

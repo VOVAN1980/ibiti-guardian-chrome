@@ -60,7 +60,7 @@ const SCENARIOS = {
   phish: () => ({
     method: 'personal_sign',
     params: [
-      toHex(`opensea.io wants you to sign in with your Ethereum account:\n${ME}\n\nNonce: 77aa01`),
+      toHex(`nft-market.example wants you to sign in with your Ethereum account:\n${ME}\n\nNonce: 77aa01`),
       ME,
     ],
   }),
@@ -103,13 +103,18 @@ const walletEl = document.getElementById('wallet');
 let chosen = null; // rdns chosen by the person, if any
 
 const DEMO_WALLET = 'dev.ibiti.demo-wallet';
-// The demo wallet is the default, so nothing here can touch real funds by
-// accident. ?wallet=real starts with an installed wallet instead.
-const preferReal = query.get('wallet') === 'real';
+// The published playground is a simulation: it only ever talks to the demo
+// wallet, whatever else is installed. (Set by the build for dist/site.)
+const PUBLIC = window.__playgroundPublic === true;
+// Locally, the demo wallet is the default too; ?wallet=real starts with an
+// installed wallet instead, for testing the extension with a real one.
+const preferReal = !PUBLIC && query.get('wallet') === 'real';
+state.public = PUBLIC;
 
 function currentWallet() {
-  if (chosen && wallets.has(chosen)) return wallets.get(chosen);
   const demo = wallets.get(DEMO_WALLET);
+  if (PUBLIC) return demo || null;
+  if (chosen && wallets.has(chosen)) return wallets.get(chosen);
   const real =
     wallets.get('io.metamask') || Array.from(wallets.values()).find((w) => w.info.rdns !== DEMO_WALLET);
   const first = preferReal ? real || demo : demo || real;
@@ -131,8 +136,9 @@ function renderWallets() {
     option.selected = Boolean(current) && current.info.rdns === info.rdns;
     pickEl.append(option);
   }
-  pickEl.hidden = wallets.size < 2;
+  pickEl.hidden = PUBLIC || wallets.size < 2;
   state.wallet = current ? current.info.rdns : null;
+  document.getElementById('wallet-section').hidden = PUBLIC;
 
   // The demo wallet needs no connecting and has no networks to switch.
   document.getElementById('connect').hidden = isDemo(current);
@@ -166,15 +172,16 @@ function report(entry) {
   const line = document.createElement('div');
   if (entry.ok) {
     line.className = `line ${guarded ? 'passed' : 'unguarded'}`;
+    const where = isDemo(currentWallet()) ? 'the demo wallet' : 'the wallet';
     line.textContent = guarded
-      ? `${name}: reached the wallet, after you let it through`
-      : `${name}: reached the wallet with nothing in between`;
+      ? `${name}: reached ${where}, after you let it through`
+      : `${name}: reached ${where} with nothing in between`;
   } else if (entry.code === 'not sent') {
     line.className = 'line wallet';
     line.textContent = `${name}: not sent. ${entry.message}`;
   } else if (/^IBITI Guardian/.test(entry.message)) {
     line.className = 'line stopped';
-    line.textContent = `${name}: stopped by Guardian. The wallet never saw it.`;
+    line.textContent = `${name}: stopped by Guardian. The ${isDemo(currentWallet()) ? 'demo ' : ''}wallet never saw it.`;
   } else {
     line.className = 'line wallet';
     line.textContent = `${name}: not signed (${entry.code ?? 'error'}) ${entry.message}`;

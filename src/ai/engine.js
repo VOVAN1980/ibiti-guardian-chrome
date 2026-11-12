@@ -20,14 +20,25 @@ export { cloudReady };
 /** Cloud model for the deeper analysis (the SDK's default hybrid cloud model). */
 const CLOUD_MODEL = 'gemini-3.5-flash-lite';
 
-let aiInstance = null;
+// Two Firebase apps with the same settings. The on-device one never starts
+// App Check, so explaining on this computer contacts no server at all (on the
+// hosted demo App Check would load reCAPTCHA). The cloud one is created on the
+// first cloud request, after the user has asked for it.
+let deviceAi = null;
+let cloudAi = null;
 
-function ai() {
-  if (aiInstance) return aiInstance;
-  const app = initializeApp(firebaseConfig);
-  startAppCheck(app); // Firebase AI Logic requires App Check
-  aiInstance = getAI(app, { backend: new GoogleAIBackend() });
-  return aiInstance;
+function onDevice() {
+  if (!deviceAi) deviceAi = getAI(initializeApp(firebaseConfig, 'guardian-device'), { backend: new GoogleAIBackend() });
+  return deviceAi;
+}
+
+function inCloud() {
+  if (!cloudAi) {
+    const app = initializeApp(firebaseConfig, 'guardian-cloud');
+    startAppCheck(app); // Firebase AI Logic requires App Check for cloud calls
+    cloudAi = getAI(app, { backend: new GoogleAIBackend() });
+  }
+  return cloudAi;
 }
 
 const ON_DEVICE_PARAMS = {
@@ -49,7 +60,7 @@ export async function deviceModelStatus() {
 
 /** Starts the one-time model download. Needs a user gesture. */
 export async function downloadDeviceModel(onProgress) {
-  const model = getGenerativeModel(ai(), {
+  const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
     onDeviceParams: ON_DEVICE_PARAMS,
   });
@@ -61,7 +72,7 @@ export async function downloadDeviceModel(onProgress) {
  * @returns {{text: string, ms: number, source: string}}
  */
 export async function explainOnDevice(prompt, onText) {
-  const model = getGenerativeModel(ai(), {
+  const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
     onDeviceParams: ON_DEVICE_PARAMS,
   });
@@ -94,7 +105,7 @@ const DEEP_SCHEMA = Schema.object({
  * @returns {{data: object, ms: number, source: string}}
  */
 export async function analyzeInCloud(prompt) {
-  const model = getGenerativeModel(ai(), {
+  const model = getGenerativeModel(inCloud(), {
     mode: InferenceMode.ONLY_IN_CLOUD,
     inCloudParams: {
       model: CLOUD_MODEL,
@@ -120,7 +131,7 @@ export async function analyzeInCloud(prompt) {
  * Used only when the user has switched on "always allow cloud".
  */
 export async function explainHybrid(prompt, onText) {
-  const model = getGenerativeModel(ai(), {
+  const model = getGenerativeModel(inCloud(), {
     mode: InferenceMode.PREFER_ON_DEVICE,
     onDeviceParams: ON_DEVICE_PARAMS,
   });
