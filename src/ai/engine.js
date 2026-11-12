@@ -8,9 +8,14 @@
 // fallback: device first, cloud when the device model is not available.
 
 import { initializeApp } from 'firebase/app';
-import { CustomProvider, initializeAppCheck } from 'firebase/app-check';
 import { GoogleAIBackend, InferenceMode, Schema, getAI, getGenerativeModel } from 'firebase/ai';
-import { appCheckDebugToken, firebaseConfig } from '../config.js';
+// Both come from the build: the extension and the hosted demo prove themselves
+// to App Check in different ways (see appcheck.ext.js and appcheck.web.js).
+import { cloudReady, startAppCheck } from 'guardian-appcheck';
+import { firebaseConfig } from 'guardian-config';
+
+/** False when this build has no way to pass App Check, so cloud is off. */
+export { cloudReady };
 
 /** Cloud model for the deeper analysis (the SDK's default hybrid cloud model). */
 const CLOUD_MODEL = 'gemini-3.5-flash-lite';
@@ -19,18 +24,8 @@ let aiInstance = null;
 
 function ai() {
   if (aiInstance) return aiInstance;
-  // App Check is required for Firebase AI Logic. An extension page cannot run
-  // reCAPTCHA (no remote scripts in Manifest V3), so the debug provider is used.
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken;
   const app = initializeApp(firebaseConfig);
-  initializeAppCheck(app, {
-    provider: new CustomProvider({
-      getToken: async () => {
-        throw new Error('App Check: debug token only');
-      },
-    }),
-    isTokenAutoRefreshEnabled: false,
-  });
+  startAppCheck(app); // Firebase AI Logic requires App Check
   aiInstance = getAI(app, { backend: new GoogleAIBackend() });
   return aiInstance;
 }

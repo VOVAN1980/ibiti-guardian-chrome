@@ -22,11 +22,15 @@
       .line.ok { color: #ff9f9f; }
       .line.blocked { color: #35d6a4; }
       .small { color: #6f7b8c; font-size: 13px; }
+      .guard { display: inline-block; margin-left: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #1b2130; color: #a7b2c2; }
+      .guard[data-state='on'] { background: #061d17; color: #37d7a6; }
+      .guard[data-state='off'] { background: #24090c; color: #ff8f8f; }
     </style>
   </head>
   <body>
     <main>
       <span class="tag">Demo site for IBITI Guardian. Not a real airdrop.</span>
+      <span class="guard" id="guard"></span>
       <div class="hero">
         <h1>Claim your free 500 USDT</h1>
         <p class="lead">Connect your wallet and press the button. It only takes a second.</p>
@@ -60,6 +64,12 @@
     </main>
 
     <script>
+      // Without the extension, load the no-install preview: the same in-page
+      // guard and the same review window, shown inside this page. (The files
+      // exist in the built site, dist/site.)
+      if (!window.__ibitiGuardian) {
+        document.write('<script src="guardian/panel.js"><\/script><script src="guardian/inpage.js"><\/script>');
+      }
       if (new URLSearchParams(location.search).has('mock')) {
         document.write('<script src="mock-wallet.js"><\/script>');
       }

@@ -1,10 +1,12 @@
-// Guardian's own review window (an extension page the site cannot touch).
+// Guardian's own review window (an extension page the site cannot touch; in
+// the hosted demo, the same page shown in a frame).
 // Facts and the risk level come from the deterministic analyzer. The AI only
 // explains them: on this computer by default, in the cloud only on request.
 
 import { analyze } from './analyzer/index.js';
-import { analyzeInCloud, deviceModelStatus, downloadDeviceModel, explainOnDevice } from './ai/engine.js';
+import { analyzeInCloud, cloudReady, deviceModelStatus, downloadDeviceModel, explainOnDevice } from './ai/engine.js';
 import { deepPrompt, explainPrompt } from './ai/prompt.js';
+import { closeReview, isPreview, loadReview, sendDecision } from './host.js';
 
 const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'No red flags found' };
 const $ = (id) => document.getElementById(id);
@@ -19,9 +21,9 @@ async function decide(decision) {
   $('reject').disabled = true;
   $('allow').disabled = true;
   try {
-    await chrome.runtime.sendMessage({ type: 'guardian:decide', id, decision });
+    await sendDecision(id, decision);
   } finally {
-    window.close();
+    closeReview();
   }
 }
 
@@ -174,6 +176,12 @@ async function runLocal(result, host) {
 
 function wireCloud(result, host) {
   const ask = $('cloud-ask');
+  if (!cloudReady) {
+    ask.hidden = true;
+    $('cloud-consent').textContent = 'Cloud analysis is not set up in this build. Nothing is sent anywhere.';
+    document.body.dataset.cloud = 'off';
+    return;
+  }
   ask.addEventListener('click', async () => {
     ask.disabled = true;
     ask.textContent = 'Asking Gemini in the cloud…';
@@ -210,16 +218,15 @@ function wireCloud(result, host) {
 }
 
 async function main() {
-  const key = `review:${id}`;
-  const stored = await chrome.storage.session.get(key);
-  const record = stored[key];
+  if (isPreview) document.body.dataset.host = 'preview';
+  const record = await loadReview(id);
   if (!record) {
     $('headline').textContent = 'This request is no longer waiting';
     $('local').hidden = true;
     $('cloud').hidden = true;
     $('allow').hidden = true;
     $('reject').textContent = 'Close';
-    $('reject').addEventListener('click', () => window.close());
+    $('reject').addEventListener('click', () => decide('reject'));
     return;
   }
 
