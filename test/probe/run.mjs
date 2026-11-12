@@ -1,0 +1,12 @@
+import { build } from 'esbuild';
+import { writeFile } from 'node:fs/promises';
+import puppeteer from 'puppeteer';
+await build({ entryPoints: ['test/probe/probe.js'], bundle: true, format: 'esm', outfile: 'dist/probe/probe.js', logLevel: 'error' });
+await writeFile('dist/probe/index.html', '<!doctype html><meta charset="utf-8"><script type="module" src="probe.js"></script>');
+const models = process.argv[2] || 'default';
+const browser = await puppeteer.launch({ headless: true });
+const page = await browser.newPage();
+await page.goto(`http://127.0.0.1:5179/dist/probe/index.html?models=${models}`);
+await page.waitForFunction(() => window.__probe && window.__probe.done, { timeout: 90000 });
+console.log(JSON.stringify(await page.evaluate(() => window.__probe), null, 1));
+await browser.close();

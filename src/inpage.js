@@ -154,8 +154,19 @@
         if (tx && typeof tx.to === 'string' && typeof data === 'string' && data.length >= 74) {
           const selector = data.slice(0, 10).toLowerCase();
           if (TOKEN_CALLS.has(selector)) {
-            return { token: tx.to, spender: `0x${data.slice(34, 74)}`, isNft: selector === '0xa22cb465' };
+            return {
+              token: tx.to,
+              spender: `0x${data.slice(34, 74)}`,
+              isNft: selector === '0xa22cb465',
+              owner: tx.from,
+              // Plain transfer: how much of this token the wallet holds.
+              wantsTokenBalance: selector === '0xa9059cbb',
+            };
           }
+        }
+        if (tx && (typeof data !== 'string' || data.length <= 2)) {
+          // Plain payment: how much of the wallet's coins it sends.
+          return { token: null, spender: null, owner: tx.from, wantsBalance: true };
         }
       } else if (method === 'eth_signTypedData_v4' || method === 'eth_signTypedData_v3') {
         const raw = params && params[1];
@@ -187,6 +198,21 @@
       jobs.push(
         withTimeout(call({ method: 'eth_getCode', params: [target.spender, 'latest'] }), 1500).then((code) => {
           if (typeof code === 'string') context.enrich.spenderIsContract = code.length > 2;
+        }),
+      );
+    }
+    if (target && target.wantsBalance && isAddress(target.owner)) {
+      jobs.push(
+        withTimeout(call({ method: 'eth_getBalance', params: [target.owner, 'latest'] }), 1500).then((v) => {
+          if (typeof v === 'string' && /^0x[0-9a-fA-F]+$/.test(v)) context.enrich.balance = v;
+        }),
+      );
+    }
+    if (target && target.wantsTokenBalance && isAddress(target.owner) && isAddress(target.token)) {
+      const data = `0x70a08231${'0'.repeat(24)}${target.owner.slice(2).toLowerCase()}`;
+      jobs.push(
+        withTimeout(call({ method: 'eth_call', params: [{ to: target.token, data }, 'latest'] }), 1500).then((v) => {
+          if (typeof v === 'string' && /^0x[0-9a-fA-F]{1,64}$/.test(v)) context.enrich.tokenBalance = v;
         }),
       );
     }

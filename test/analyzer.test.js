@@ -30,7 +30,7 @@ test('unlimited approve of verified USDT to an unknown spender is danger', () =>
   assert.match(r.reasons[0], /any amount of USDT/);
 });
 
-test('limited approve shows the exact amount and is caution', () => {
+test('limited approve to an unknown spender shows the exact amount and is caution', () => {
   const r = analyze(tx(USDC, call('0x095ea7b3', pad(SPENDER), uint(100_000_000n))));
   assert.equal(r.risk, 'caution');
   assert.equal(r.headline, 'Spending permission for 100 USDC');
@@ -82,8 +82,54 @@ test('setApprovalForAll true is danger, false is a revoke', () => {
 test('plain coin transfer shows amount and recipient', () => {
   const r = analyze(tx(SPENDER, '0x', '0x6f05b59d3b20000')); // 0.5 ETH
   assert.equal(r.kind, 'nativeTransfer');
-  assert.equal(r.risk, 'caution');
+  assert.equal(r.risk, 'caution', 'balance unknown: ask the user to check');
   assert.equal(r.headline, 'Send 0.5 ETH');
+});
+
+test('a small payment out of a larger balance raises no red flag', () => {
+  // 0.01 ETH out of 2 ETH
+  const r = analyze({ ...tx(SPENDER, '0x', '0x2386f26fc10000'), enrich: { balance: '0x1bc16d674ec80000' } });
+  assert.equal(r.risk, 'info');
+  assert.match(r.facts.find((f) => f.label === 'Amount').note, /less than 1% of your ETH/);
+});
+
+test('a payment of nearly the whole balance is danger', () => {
+  // 1.95 ETH out of 2 ETH
+  const r = analyze({ ...tx(SPENDER, '0x', '0x1b0fcaab20030000'), enrich: { balance: '0x1bc16d674ec80000' } });
+  assert.equal(r.risk, 'danger');
+  assert.ok(r.reasons.some((x) => /almost all of the ETH/.test(x)));
+});
+
+test('a token transfer is judged by its share of the token balance', () => {
+  const small = analyze({
+    ...tx(USDT, call('0xa9059cbb', pad(SPENDER), uint(5_000_000n))),
+    enrich: { tokenBalance: '1000000000' },
+  });
+  assert.equal(small.risk, 'info');
+  const all = analyze({
+    ...tx(USDT, call('0xa9059cbb', pad(SPENDER), uint(1_000_000_000n))),
+    enrich: { tokenBalance: '1000000000' },
+  });
+  assert.equal(all.risk, 'danger');
+});
+
+test('a limited approval to a known protocol raises no red flag', () => {
+  const r = analyze(tx(USDC, call('0x095ea7b3', pad(PERMIT2), uint(25_000_000n))));
+  assert.equal(r.risk, 'info');
+  assert.equal(r.headline, 'Spending permission for 25 USDC');
+});
+
+test('"verified contract" needs the real address on that network, not just the name', () => {
+  // The Ethereum USDT address used on BNB Chain is not the BNB Chain USDT.
+  const wrongChain = analyze({
+    ...tx(USDT, call('0x095ea7b3', pad(SPENDER), uint(1000n))),
+    chainId: 56,
+    enrich: { token: { symbol: 'USDT', decimals: 6 } },
+  });
+  const tokenFact = wrongChain.facts.find((f) => f.label === 'Token');
+  assert.equal(tokenFact.note, undefined);
+  assert.equal(tokenFact.value, 'USDT (unverified token)');
+  assert.equal(wrongChain.risk, 'danger');
 });
 
 test('token transfer decodes recipient and amount', () => {
