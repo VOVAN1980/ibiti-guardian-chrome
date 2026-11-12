@@ -1,10 +1,14 @@
 // Guardian's own review window (an extension page the site cannot touch).
-// Shows the facts from the deterministic analyzer and sends the decision.
+// Facts and the risk level come from the deterministic analyzer. The AI only
+// explains them: on this computer by default, in the cloud only on request.
 
 import { analyze } from './analyzer/index.js';
+import { analyzeInCloud, deviceModelStatus, downloadDeviceModel, explainOnDevice } from './ai/engine.js';
+import { deepPrompt, explainPrompt } from './ai/prompt.js';
 
-const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'Low risk' };
+const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'No red flags found' };
 const $ = (id) => document.getElementById(id);
+const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
 const id = new URLSearchParams(location.search).get('id');
 let decided = false;
@@ -21,21 +25,21 @@ async function decide(decision) {
   }
 }
 
+function hostOf(origin) {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}
+
 function render(record, result) {
   document.body.dataset.risk = result.risk;
   $('badge').textContent = BADGE[result.risk];
-
-  let host = record.origin;
-  try {
-    host = new URL(record.origin).host;
-  } catch {
-    // keep the raw origin
-  }
-  $('origin').textContent = host;
+  $('origin').textContent = hostOf(record.origin);
   $('headline').textContent = result.headline;
 
-  const facts = $('facts');
-  facts.replaceChildren(
+  $('facts').replaceChildren(
     ...result.facts.map((f) => {
       const row = document.createElement('div');
       row.className = 'fact';
@@ -80,12 +84,116 @@ function render(record, result) {
   (safeIsReject ? $('reject') : $('allow')).focus();
 }
 
+// ── On-device explanation: starts by itself, nothing leaves the computer ──
+
+function setChip(element, source, ms) {
+  element.dataset.source = source;
+  element.textContent = `${source === 'on_device' ? 'On device' : 'Cloud'} · ${seconds(ms)}`;
+  element.hidden = false;
+}
+
+async function runLocal(result, host) {
+  const text = $('local-text');
+  const meta = $('local-meta');
+  const download = $('local-download');
+  const status = await deviceModelStatus();
+  document.body.dataset.local = status;
+
+  if (status === 'unavailable') {
+    text.classList.remove('pending');
+    text.textContent = 'On-device AI is not available in this browser. The facts below do not depend on it.';
+    return;
+  }
+
+  if (status === 'downloadable' || status === 'downloading') {
+    text.classList.remove('pending');
+    text.textContent = 'The on-device model is not downloaded yet.';
+    download.hidden = false;
+    download.onclick = async () => {
+      download.disabled = true;
+      try {
+        await downloadDeviceModel((percent) => {
+          download.textContent = `Downloading the model… ${percent}%`;
+        });
+        download.hidden = true;
+        await runLocal(result, host);
+      } catch (error) {
+        download.disabled = false;
+        download.textContent = 'Download failed. Try again';
+        console.warn('[Guardian] model download failed', error);
+      }
+    };
+    return;
+  }
+
+  text.classList.add('pending');
+  text.textContent = 'Explaining on this computer';
+  try {
+    const out = await explainOnDevice(explainPrompt(result, host), (partial) => {
+      text.classList.remove('pending');
+      text.textContent = partial;
+    });
+    text.classList.remove('pending');
+    text.textContent = out.text;
+    setChip($('local-chip'), out.source, out.ms);
+    meta.textContent = 'Gemini Nano in Chrome. Nothing about this request left your computer.';
+    meta.hidden = false;
+    document.body.dataset.local = 'done';
+  } catch (error) {
+    text.classList.remove('pending');
+    text.textContent = 'The on-device model could not answer this time. The facts below do not depend on it.';
+    document.body.dataset.local = 'error';
+    console.warn('[Guardian] on-device explanation failed', error);
+  }
+}
+
+// ── Cloud analysis: only after the user presses the button ────────────────
+
+function wireCloud(result, host) {
+  const ask = $('cloud-ask');
+  ask.addEventListener('click', async () => {
+    ask.disabled = true;
+    ask.textContent = 'Asking Gemini in the cloud…';
+    document.body.dataset.cloud = 'pending';
+    try {
+      const out = await analyzeInCloud(deepPrompt(result, host));
+      $('cloud-summary').textContent = String(out.data.summary || '');
+      $('cloud-confirm').textContent = String(out.data.ifYouConfirm || '');
+      $('cloud-pattern').textContent = String(out.data.pattern || '');
+      $('cloud-checks').replaceChildren(
+        ...(Array.isArray(out.data.checks) ? out.data.checks : []).slice(0, 4).map((item) => {
+          const li = document.createElement('li');
+          li.textContent = String(item);
+          return li;
+        }),
+      );
+      $('cloud-result').hidden = false;
+      setChip($('cloud-chip'), out.source, out.ms);
+      ask.hidden = true;
+      $('cloud-consent').textContent = 'Analyzed by Gemini through Firebase AI Logic, at your request.';
+      document.body.dataset.cloud = 'done';
+    } catch (error) {
+      const message = String((error && error.message) || error);
+      ask.disabled = false;
+      ask.textContent = 'Cloud analysis failed. Try again';
+      $('cloud-consent').textContent = /free tier is not available|billing/i.test(message)
+        ? 'Cloud AI is not switched on for this Firebase project yet. Nothing was analyzed in the cloud.'
+        : 'The cloud could not be reached. Nothing was analyzed in the cloud.';
+      document.body.dataset.cloud = 'error';
+      document.body.dataset.cloudError = message.slice(0, 300);
+      console.warn('[Guardian] cloud analysis failed', error);
+    }
+  });
+}
+
 async function main() {
   const key = `review:${id}`;
   const stored = await chrome.storage.session.get(key);
   const record = stored[key];
   if (!record) {
     $('headline').textContent = 'This request is no longer waiting';
+    $('local').hidden = true;
+    $('cloud').hidden = true;
     $('allow').hidden = true;
     $('reject').textContent = 'Close';
     $('reject').addEventListener('click', () => window.close());
@@ -93,6 +201,7 @@ async function main() {
   }
 
   const result = analyze(record);
+  const host = hostOf(record.origin);
   render(record, result);
 
   $('reject').addEventListener('click', () => decide('reject'));
@@ -100,6 +209,9 @@ async function main() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') decide('reject');
   });
+
+  wireCloud(result, host);
+  runLocal(result, host);
 }
 
 main();

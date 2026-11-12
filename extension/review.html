@@ -17,6 +17,16 @@
       <p class="origin"><strong id="origin"></strong> wants your wallet to confirm:</p>
       <h1 id="headline">Checking the request…</h1>
 
+      <section class="ai" id="local" aria-live="polite">
+        <div class="ai-head">
+          <span class="ai-title">In plain words</span>
+          <span class="chip" id="local-chip" hidden></span>
+        </div>
+        <p class="ai-text" id="local-text"></p>
+        <button class="quiet" id="local-download" type="button" hidden>Download the on-device model (one time)</button>
+        <p class="ai-meta" id="local-meta" hidden></p>
+      </section>
+
       <dl class="facts" id="facts"></dl>
 
       <section class="why" id="why" hidden>
@@ -27,6 +37,24 @@
       <section class="message" id="message" hidden>
         <h2>Message to sign</h2>
         <pre id="message-text"></pre>
+      </section>
+
+      <section class="ai cloud" id="cloud">
+        <div class="ai-head">
+          <span class="ai-title">Deeper analysis</span>
+          <span class="chip" id="cloud-chip" hidden></span>
+        </div>
+        <div id="cloud-result" hidden>
+          <p class="ai-text" id="cloud-summary"></p>
+          <p class="ai-sub" id="cloud-confirm"></p>
+          <p class="ai-sub" id="cloud-pattern"></p>
+          <ul class="checks" id="cloud-checks"></ul>
+        </div>
+        <button class="quiet" id="cloud-ask" type="button">Ask cloud AI</button>
+        <p class="ai-meta" id="cloud-consent">
+          Sends the decoded details above (site, action, token, amount, the other party’s address) to Google
+          Gemini through Firebase. Your wallet address is not sent. Nothing is sent unless you press the button.
+        </p>
       </section>
     </main>
 

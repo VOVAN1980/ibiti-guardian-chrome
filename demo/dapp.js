@@ -2,7 +2,8 @@
 // sites (and real drainers) do. Nothing here touches real funds when the demo
 // wallet is used.
 
-const ME = '0x1111111111111111111111111111111111111111';
+// The connected account. Until a wallet is connected, the demo wallet's address.
+let ME = '0x1111111111111111111111111111111111111111';
 const USDT = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
 const FAKE_USDT = '0x00000000000000000000000000000000DeaDBeef';
@@ -96,3 +97,37 @@ async function run(scenario) {
 for (const button of document.querySelectorAll('[data-scenario]')) {
   button.addEventListener('click', () => run(button.dataset.scenario));
 }
+
+// ── Real wallets: connect first, and prefer a test network ────────────────
+const walletEl = document.getElementById('wallet');
+
+async function connect() {
+  const provider = window.ethereum;
+  if (!provider) {
+    walletEl.textContent = 'No wallet found. Add ?mock=1 to the address to use the demo wallet.';
+    return;
+  }
+  try {
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    if (accounts && accounts[0]) ME = accounts[0];
+    const chainId = await provider.request({ method: 'eth_chainId' });
+    walletEl.textContent = `Connected: ${ME.slice(0, 6)}…${ME.slice(-4)} on chain ${parseInt(chainId, 16)}${provider.isMockWallet ? ' (demo wallet)' : ''}`;
+    state.account = ME;
+    state.chainId = parseInt(chainId, 16);
+  } catch (error) {
+    walletEl.textContent = `Not connected: ${String((error && error.message) || error)}`;
+  }
+}
+
+async function useTestnet() {
+  try {
+    await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+    await connect();
+  } catch (error) {
+    walletEl.textContent = `Could not switch network: ${String((error && error.message) || error)}`;
+  }
+}
+
+document.getElementById('connect').addEventListener('click', connect);
+document.getElementById('testnet').addEventListener('click', useTestnet);
+if (window.ethereum && window.ethereum.isMockWallet) connect();

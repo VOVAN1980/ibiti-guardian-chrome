@@ -34,6 +34,8 @@
           return [ACCOUNT];
         case 'eth_chainId':
           return '0x1';
+        case 'eth_getBalance':
+          return '0x1bc16d674ec80000'; // 2 ETH
         case 'eth_getCode':
           return CONTRACTS.has(String(params[0]).toLowerCase()) ? '0x6080' : '0x';
         case 'eth_call': {
@@ -42,6 +44,8 @@
           if (!token) return '0x';
           if (call.data === '0x95d89b41') return abiString(token.symbol);
           if (call.data === '0x313ce567') return '0x' + token.decimals.toString(16).padStart(64, '0');
+          // balanceOf: the demo account holds 1,000 of each token.
+          if (String(call.data).startsWith('0x70a08231')) return '0x' + (1000n * 10n ** BigInt(token.decimals)).toString(16).padStart(64, '0');
           return '0x';
         }
         case 'eth_sendTransaction':

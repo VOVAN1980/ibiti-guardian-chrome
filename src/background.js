@@ -3,7 +3,7 @@
 // chrome.storage.session, so nothing depends on this worker staying awake.
 
 const REVIEW_WIDTH = 420;
-const REVIEW_HEIGHT = 680;
+const REVIEW_HEIGHT = 760;
 
 const reviewKey = (id) => `review:${id}`;
 const windowKey = (windowId) => `window:${windowId}`;

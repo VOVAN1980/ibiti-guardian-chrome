@@ -113,7 +113,7 @@ function analyzeTransaction(tx, ctx) {
   }
 
   if (strip0x(data).length === 0) {
-    return nativeTransfer(to, value, chain);
+    return nativeTransfer(to, value, chain, ctx);
   }
 
   const selector = selectorOf(data);
@@ -185,23 +185,65 @@ function analyzeTransaction(tx, ctx) {
   };
 }
 
-function nativeTransfer(to, value, chain) {
+/**
+ * A payment's risk is bounded by its amount. With the wallet balance known,
+ * a small share is an ordinary payment; most of the balance is what "send a
+ * little to claim" scams aim for. Without the balance, it stays "check".
+ */
+function shareOfBalance(amount, balance) {
+  const total = toBigInt(balance);
+  if (amount === null || total === null || total <= 0n) return null;
+  return Number((amount * 1000n) / total) / 10; // percent, one decimal
+}
+
+function transferRisk(share, what) {
+  if (share === null) {
+    return { risk: 'caution', note: null, reasons: [] };
+  }
+  const percent = share >= 99.95 ? 'all' : `about ${share < 1 ? 'less than 1' : Math.round(share)}%`;
+  const note = `${percent === 'all' ? 'All' : percent} of your ${what}`;
+  if (share >= 90) {
+    return {
+      risk: 'danger',
+      note,
+      reasons: [`This would send ${percent === 'all' ? 'all' : 'almost all'} of the ${what} in this wallet.`],
+    };
+  }
+  if (share >= 25) return { risk: 'caution', note, reasons: [] };
+  return { risk: 'info', note, reasons: [] };
+}
+
+function nativeTransfer(to, value, chain, ctx) {
   const amount = `${formatUnits(value, 18)} ${chain.native}`;
+  if (value === 0n) {
+    return {
+      kind: 'nativeTransfer',
+      risk: 'info',
+      headline: 'Empty transaction',
+      facts: [fact('Action', 'Send coins'), fact('Amount', amount), fact('To', to, { mono: true }), fact('Network', chain.name)],
+      reasons: [],
+      subject: { action: 'nativeTransfer', to, amount },
+    };
+  }
+  const judged = transferRisk(shareOfBalance(value, ctx.enrich.balance), chain.native);
   return {
     kind: 'nativeTransfer',
-    risk: value > 0n ? 'caution' : 'info',
-    headline: value > 0n ? `Send ${amount}` : 'Empty transaction',
+    risk: judged.risk,
+    headline: `Send ${amount}`,
     facts: [
       fact('Action', 'Send coins'),
-      fact('Amount', amount),
+      fact('Amount', amount, {
+        ...(judged.note ? { note: judged.note } : {}),
+        ...(judged.risk === 'danger' ? { tone: 'danger' } : {}),
+      }),
       fact('To', to, { mono: true }),
       fact('Network', chain.name),
     ],
-    reasons:
-      value > 0n
-        ? ['This sends coins straight to the address above. A confirmed transfer cannot be undone.']
-        : [],
-    subject: { action: 'nativeTransfer', to, amount },
+    reasons: [
+      ...judged.reasons,
+      'This sends coins straight to the address above. A confirmed transfer cannot be undone.',
+    ],
+    subject: { action: 'nativeTransfer', to, amount, shareOfBalance: judged.note },
   };
 }
 
@@ -286,6 +328,8 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt }) {
     if (!sp.known) risk = 'danger';
   } else {
     reasons.unshift(`The spender could move up to ${amt.text} from your wallet without asking again.`);
+    // Bounded amount to a widely used protocol: the ordinary first step of a swap.
+    if (sp.known && sp.risk === 'info') risk = 'info';
   }
   if (!sp.known) reasons.push('Guardian does not recognise the spender address.');
   if (tok.impersonates) {
@@ -357,20 +401,30 @@ function tokenTransfer({ token, from, recipient, amount, ctx }) {
   const chain = chainInfo(ctx.chainId);
   const tok = describeToken(token, ctx);
   const amt = describeAmount(amount, tok);
+  const judged = transferRisk(
+    from ? null : shareOfBalance(amount, ctx.enrich.tokenBalance),
+    tok.symbol || 'tokens',
+  );
   const facts = [
     fact('Action', from ? 'Token transfer (transferFrom)' : 'Token transfer'),
     fact('Token', tok.label, tok.verified ? { tone: 'ok', note: 'verified contract' } : {}),
-    fact('Amount', amt.text),
+    fact('Amount', amt.text, {
+      ...(judged.note ? { note: judged.note } : {}),
+      ...(judged.risk === 'danger' ? { tone: 'danger' } : {}),
+    }),
   ];
   if (from) facts.push(fact('From', from, { mono: true }));
   facts.push(fact('To', recipient, { mono: true }), fact('Network', chain.name));
   return {
     kind: 'transfer',
-    risk: 'caution',
+    risk: judged.risk,
     headline: `Send ${amt.text}`,
     facts,
-    reasons: ['This moves tokens to the address above. A confirmed transfer cannot be undone.'],
-    subject: { action: 'transfer', token: tok, to: recipient, amount: amt.text },
+    reasons: [
+      ...judged.reasons,
+      'This moves tokens to the address above. A confirmed transfer cannot be undone.',
+    ],
+    subject: { action: 'transfer', token: tok, to: recipient, amount: amt.text, shareOfBalance: judged.note },
   };
 }
 

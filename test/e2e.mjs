@@ -117,8 +117,8 @@ const expectations = {
   blind: { risk: 'danger', headline: 'Blind signature request' },
   fake: { risk: 'danger', headline: 'Spending permission for 1 USDT' },
   phish: { risk: 'danger', headline: 'Sign-in request for a different site' },
-  transfer: { risk: 'caution', headline: 'Send 0.01 ETH' },
-  limited: { risk: 'caution', headline: 'Spending permission for 25 USDC' },
+  transfer: { risk: 'info', headline: 'Send 0.01 ETH' },
+  limited: { risk: 'info', headline: 'Spending permission for 25 USDC' },
   signin: { risk: 'info', headline: 'Sign in to 127.0.0.1:5179' },
   revoke: { risk: 'info', headline: 'Remove a spending permission for USDT' },
 };
@@ -140,6 +140,51 @@ for (const [scenario, expected] of Object.entries(expectations)) {
 
 await step('nothing slipped through while requests were rejected', async () => {
   assert.equal(await walletLog(), 1);
+});
+
+await step('cloud analysis runs only after the user asks for it', async () => {
+  const before = new Set(browser.targets());
+  await page.click('[data-scenario="claim"]');
+  const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
+  const review = await target.asPage();
+  const calls = [];
+  review.on('request', (request) => {
+    const url = request.url();
+    if (!url.startsWith('chrome-extension://')) calls.push(url);
+  });
+  try {
+    await review.waitForFunction(() => document.getElementById('badge').textContent !== '');
+    await review.waitForFunction(() => document.body.dataset.local !== undefined);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    assert.deepEqual(calls, [], 'no network request before the user asks for the cloud');
+
+    await review.click('#cloud-ask');
+    await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 40000 });
+    const cloudError = await review.evaluate(() => document.body.dataset.cloudError || '');
+    if (/free tier is not available|billing/i.test(cloudError)) {
+      // The Firebase project has no paid tier: the request was made (after
+      // consent) and Google refused it. Not a Guardian failure.
+      assert.ok(calls.some((url) => url.includes('googleapis.com')));
+      console.log('     cloud: SKIPPED, the Firebase project has no Gemini API billing yet');
+      return;
+    }
+    const cloud = await review.evaluate(() => ({
+      state: document.body.dataset.cloud,
+      chip: document.getElementById('cloud-chip').textContent,
+      summary: document.getElementById('cloud-summary').textContent,
+      checks: document.querySelectorAll('#cloud-checks li').length,
+    }));
+    assert.equal(cloud.state, 'done');
+    assert.match(cloud.chip, /^Cloud · \d/);
+    assert.ok(cloud.summary.length > 20, 'cloud summary is present');
+    assert.ok(cloud.checks >= 1, 'cloud analysis lists things to check');
+    assert.ok(calls.some((url) => url.includes('googleapis.com')), 'the cloud call went through Firebase');
+    console.log(`     cloud: ${cloud.chip} | ${cloud.summary}`);
+  } finally {
+    await review.click('#reject');
+    expectedHistory += 1;
+    await waitForHistory(expectedHistory);
+  }
 });
 
 await browser.close();
