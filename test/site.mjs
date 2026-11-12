@@ -36,6 +36,24 @@ page.on('request', (request) => {
 });
 await page.goto(`${origin}/?mock=1`, { waitUntil: 'load' });
 
+// Waits are a plain check loop. Puppeteer's own waitForFunction sometimes
+// never fires inside a freshly navigated iframe, although the page is fine.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function until(target, fn, ...args) {
+  const end = Date.now() + 15000;
+  let last;
+  while (Date.now() < end) {
+    try {
+      last = await Promise.race([target.evaluate(fn, ...args), sleep(2000).then(() => 'evaluate hung')]);
+      if (last === true) return;
+    } catch (error) {
+      last = String(error.message).split('\n')[0];
+    }
+    await sleep(100);
+  }
+  throw new Error(`timed out waiting for ${String(fn).slice(0, 80)} (last: ${String(last)})`);
+}
+
 let failed = false;
 const step = async (name, fn) => {
   try {
@@ -44,30 +62,42 @@ const step = async (name, fn) => {
   } catch (error) {
     failed = true;
     console.log(`FAIL ${name}\n     ${String(error && error.message).split('\n')[0]}`);
+    if (process.env.DEBUG) {
+      console.log(
+        await page.evaluate(() =>
+          JSON.stringify({
+            url: location.search,
+            history: window.__dapp.history,
+            log: window.__mockWalletLog.length,
+            panel: Boolean(document.getElementById('ibiti-guardian-preview')),
+            lines: Array.from(document.querySelectorAll('#log .line'), (l) => l.textContent),
+          }),
+        ),
+      );
+    }
   }
 };
 
 /** Clicks a scenario and returns the review frame once it has rendered. */
+const seen = new Set();
 const openReview = async (selector) => {
+  // The frame object for the review page itself, not the blank frame the
+  // iframe starts with.
+  const next = page.waitForFrame((f) => !seen.has(f) && !f.detached && f.url().includes('/guardian/review.html'));
   await page.click(selector);
-  await page.waitForFunction(() => {
-    const host = document.getElementById('ibiti-guardian-preview');
-    return Boolean(host && host.shadowRoot.querySelector('iframe'));
-  });
-  const handle = await page.evaluateHandle(() =>
-    document.getElementById('ibiti-guardian-preview').shadowRoot.querySelector('iframe'),
-  );
-  const frame = await handle.asElement().contentFrame();
+  const frame = await next;
+  seen.add(frame);
   // Rendered, styled and done sliding in, so a click lands where it is aimed.
-  await frame.waitForFunction(
+  await until(
+    frame,
     () =>
-      document.getElementById('badge')?.textContent !== '' && getComputedStyle(document.body).display === 'flex',
+      Boolean(document.getElementById('badge')?.textContent) && getComputedStyle(document.body).display === 'flex',
   );
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
   return frame;
 };
 const walletLog = () => page.evaluate(() => window.__mockWalletLog);
-const panelGone = () => page.waitForFunction(() => !document.getElementById('ibiti-guardian-preview'));
+const panelGone = () => until(page, () => !document.getElementById('ibiti-guardian-preview'));
 
 await step('the preview starts by itself when no extension is installed', async () => {
   assert.equal(await page.evaluate(() => window.__ibitiGuardianPreview), true);
@@ -82,7 +112,7 @@ await step('a dangerous approve is held and described before the wallet sees it'
   assert.equal((await walletLog()).length, 0, 'held');
   await frame.click('#reject');
   await panelGone();
-  await page.waitForFunction(() => window.__dapp.history.length === 1);
+  await until(page, () => window.__dapp.history.length === 1);
   assert.equal(await page.evaluate(() => window.__dapp.last.code), 4001);
   assert.equal((await walletLog()).length, 0, 'reject kept it from the wallet');
 });
@@ -91,7 +121,7 @@ await step('Continue forwards the request to the wallet unchanged', async () => 
   const frame = await openReview('#claim');
   await frame.click('#allow');
   await panelGone();
-  await page.waitForFunction(() => window.__dapp.history.length === 2);
+  await until(page, () => window.__dapp.history.length === 2);
   const log = await walletLog();
   assert.equal(log.length, 1);
   assert.deepEqual(log[0], await page.evaluate(() => window.__dapp.sent));
@@ -103,7 +133,7 @@ await step('closing the panel counts as Reject', async () => {
     document.getElementById('ibiti-guardian-preview').shadowRoot.querySelector('.bar button').click(),
   );
   await panelGone();
-  await page.waitForFunction(() => window.__dapp.history.length === 3);
+  await until(page, () => window.__dapp.history.length === 3);
   assert.equal(await page.evaluate(() => window.__dapp.last.code), 4001);
   assert.equal((await walletLog()).length, 1);
 });
@@ -114,6 +144,28 @@ await step('a safe request is shown as safe', async () => {
   await frame.click('#allow');
   await panelGone();
   assert.equal((await walletLog()).length, 2);
+});
+
+await step('a plain visit uses the demo wallet and is guarded', async () => {
+  await page.goto(`${origin}/`, { waitUntil: 'load' });
+  assert.equal(await page.evaluate(() => window.__dapp.wallet), 'dev.ibiti.demo-wallet');
+  const frame = await openReview('#claim');
+  assert.equal((await walletLog()).length, 0, 'held');
+  await frame.click('#reject');
+  await panelGone();
+  await until(page, () => window.__dapp.history.length === 1);
+  assert.equal((await walletLog()).length, 0);
+});
+
+await step('with Guardian switched off, the same request goes straight to the wallet', async () => {
+  await page.click('#guard-toggle');
+  await until(page, () => location.search.includes('guardian=off') && Boolean(window.__dapp));
+  assert.equal(await page.evaluate(() => document.getElementById('guard').dataset.state), 'off');
+  await page.click('#claim');
+  await until(page, () => window.__dapp.history.length === 1);
+  assert.equal(await page.evaluate(() => window.__dapp.last.ok), true);
+  assert.equal((await walletLog()).length, 1, 'nothing held it');
+  assert.equal(await page.evaluate(() => Boolean(document.getElementById('ibiti-guardian-preview'))), false);
 });
 
 await step('nothing was sent to any other server', async () => {

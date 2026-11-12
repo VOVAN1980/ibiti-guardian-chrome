@@ -68,18 +68,29 @@ const SCENARIOS = {
 
 const logEl = document.getElementById('log');
 
+const query = new URLSearchParams(location.search);
+
 // Is anything standing between this site and the wallet?
 const guardEl = document.getElementById('guard');
-if (window.__ibitiGuardianPreview) {
-  guardEl.textContent = 'Guardian preview is on: nothing to install';
-  guardEl.dataset.state = 'on';
-} else if (window.__ibitiGuardian) {
-  guardEl.textContent = 'IBITI Guardian extension is on';
-  guardEl.dataset.state = 'on';
-} else {
-  guardEl.textContent = 'Guardian is off: requests go straight to the wallet';
-  guardEl.dataset.state = 'off';
+const toggleEl = document.getElementById('guard-toggle');
+const preview = Boolean(window.__ibitiGuardianPreview);
+const guarded = preview || Boolean(window.__ibitiGuardian);
+if (!guarded || preview) {
+  // The preview can be left out, to compare. An installed extension cannot
+  // be switched off by a page, which is the point of it.
+  const url = new URL(location.href);
+  if (preview) url.searchParams.set('guardian', 'off');
+  else url.searchParams.delete('guardian');
+  toggleEl.href = url.href;
+  toggleEl.textContent = preview ? 'Turn Guardian off to see the difference.' : 'Turn Guardian back on.';
+  toggleEl.hidden = false;
 }
+guardEl.dataset.state = guarded ? 'on' : 'off';
+guardEl.textContent = preview
+  ? 'Guardian is on (preview, nothing to install)'
+  : guarded
+    ? 'IBITI Guardian extension is on'
+    : 'Guardian is off: requests go straight to the wallet';
 const state = (window.__dapp = { last: null, history: [], wallets: [] });
 
 // ── Which wallet ───────────────────────────────────────────────────────────
@@ -91,16 +102,23 @@ const pickEl = document.getElementById('pick');
 const walletEl = document.getElementById('wallet');
 let chosen = null; // rdns chosen by the person, if any
 
+const DEMO_WALLET = 'dev.ibiti.demo-wallet';
+// The demo wallet is the default, so nothing here can touch real funds by
+// accident. ?wallet=real starts with an installed wallet instead.
+const preferReal = query.get('wallet') === 'real';
+
 function currentWallet() {
   if (chosen && wallets.has(chosen)) return wallets.get(chosen);
-  const demo = wallets.get('dev.ibiti.demo-wallet');
-  if (demo) return demo;
-  const metamask = wallets.get('io.metamask');
-  if (metamask) return metamask;
-  const first = wallets.values().next().value;
+  const demo = wallets.get(DEMO_WALLET);
+  const real =
+    wallets.get('io.metamask') || Array.from(wallets.values()).find((w) => w.info.rdns !== DEMO_WALLET);
+  const first = preferReal ? real || demo : demo || real;
   if (first) return first;
   return window.ethereum ? { info: { name: 'Browser wallet', rdns: '' }, provider: window.ethereum } : null;
 }
+
+const isDemo = (wallet) => Boolean(wallet) && wallet.info.rdns === DEMO_WALLET;
+let shown = null; // the wallet the controls below were last drawn for
 
 function renderWallets() {
   state.wallets = Array.from(wallets.values(), (w) => w.info.rdns);
@@ -109,12 +127,22 @@ function renderWallets() {
   for (const { info } of wallets.values()) {
     const option = document.createElement('option');
     option.value = info.rdns;
-    option.textContent = info.name;
+    option.textContent = info.rdns === DEMO_WALLET ? 'Demo wallet (no keys, nothing real)' : info.name;
     option.selected = Boolean(current) && current.info.rdns === info.rdns;
     pickEl.append(option);
   }
   pickEl.hidden = wallets.size < 2;
   state.wallet = current ? current.info.rdns : null;
+
+  // The demo wallet needs no connecting and has no networks to switch.
+  document.getElementById('connect').hidden = isDemo(current);
+  document.getElementById('testnet').hidden = isDemo(current);
+  document.getElementById('real-note').hidden = !current || isDemo(current);
+  if (current && current.provider !== shown) {
+    shown = current.provider;
+    walletEl.textContent = 'Not connected.';
+    if (isDemo(current)) connect();
+  }
 }
 
 window.addEventListener('eip6963:announceProvider', (event) => {
@@ -128,24 +156,33 @@ window.dispatchEvent(new Event('eip6963:requestProvider'));
 pickEl.addEventListener('change', () => {
   chosen = pickEl.value;
   renderWallets();
-  walletEl.textContent = 'Not connected.';
 });
 
 function report(entry) {
   state.last = entry;
   state.history.push(entry);
+  const button = document.querySelector(`[data-scenario="${entry.scenario}"]`);
+  const name = button ? button.textContent.trim() : entry.scenario;
   const line = document.createElement('div');
-  line.className = `line ${entry.ok ? 'ok' : 'blocked'}`;
-  line.textContent = entry.ok
-    ? `${entry.scenario}: the wallet received the request`
-    : `${entry.scenario}: stopped (${entry.code ?? 'error'}) ${entry.message}`;
+  if (entry.ok) {
+    line.className = `line ${guarded ? 'passed' : 'unguarded'}`;
+    line.textContent = guarded
+      ? `${name}: reached the wallet, after you let it through`
+      : `${name}: reached the wallet with nothing in between`;
+  } else if (/^IBITI Guardian/.test(entry.message)) {
+    line.className = 'line stopped';
+    line.textContent = `${name}: stopped by Guardian. The wallet never saw it.`;
+  } else {
+    line.className = 'line wallet';
+    line.textContent = `${name}: not signed (${entry.code ?? 'error'}) ${entry.message}`;
+  }
   logEl.prepend(line);
 }
 
 async function run(scenario) {
   const wallet = currentWallet();
   if (!wallet) {
-    report({ scenario, ok: false, message: 'No wallet found. Open this page with ?mock=1 to use the demo wallet.' });
+    report({ scenario, ok: false, message: 'No wallet found.' });
     return;
   }
   const provider = wallet.provider;
@@ -170,7 +207,7 @@ const CHAIN_NAMES = { 1: 'Ethereum mainnet', 11155111: 'Sepolia test network' };
 async function connect() {
   const wallet = currentWallet();
   if (!wallet) {
-    walletEl.textContent = 'No wallet found. Add ?mock=1 to the address to use the demo wallet.';
+    walletEl.textContent = 'No wallet found.';
     return;
   }
   const provider = wallet.provider;
@@ -178,7 +215,9 @@ async function connect() {
     const accounts = await provider.request({ method: 'eth_requestAccounts' });
     if (accounts && accounts[0]) ME = accounts[0];
     const chainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
-    walletEl.textContent = `Connected with ${wallet.info.name}: ${ME.slice(0, 6)}…${ME.slice(-4)} on ${CHAIN_NAMES[chainId] || `chain ${chainId}`}`;
+    walletEl.textContent = isDemo(wallet)
+      ? 'Demo wallet: no keys, no real funds. It only records which requests reach it.'
+      : `Connected with ${wallet.info.name}: ${ME.slice(0, 6)}…${ME.slice(-4)} on ${CHAIN_NAMES[chainId] || `chain ${chainId}`}`;
     state.account = ME;
     state.chainId = chainId;
   } catch (error) {
@@ -200,4 +239,3 @@ async function useTestnet() {
 document.getElementById('connect').addEventListener('click', connect);
 document.getElementById('testnet').addEventListener('click', useTestnet);
 renderWallets();
-if (window.ethereum && window.ethereum.isMockWallet) connect();
