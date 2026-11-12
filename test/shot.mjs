@@ -16,5 +16,10 @@ const target = await browser.waitForTarget((t) => !before.has(t) && t.url().incl
 const review = await target.asPage();
 await review.setViewport({ width: 420, height: 680, deviceScaleFactor: 2 });
 await review.waitForFunction(() => document.getElementById('badge').textContent !== '');
+if (process.argv.includes('--cloud')) {
+  await review.click('#cloud-ask');
+  await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 40000 });
+  await review.setViewport({ width: 420, height: 1180, deviceScaleFactor: 2 });
+}
 await review.screenshot({ path: output });
 await browser.close();
