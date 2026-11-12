@@ -169,6 +169,9 @@ function report(entry) {
     line.textContent = guarded
       ? `${name}: reached the wallet, after you let it through`
       : `${name}: reached the wallet with nothing in between`;
+  } else if (entry.code === 'not sent') {
+    line.className = 'line wallet';
+    line.textContent = `${name}: not sent. ${entry.message}`;
   } else if (/^IBITI Guardian/.test(entry.message)) {
     line.className = 'line stopped';
     line.textContent = `${name}: stopped by Guardian. The wallet never saw it.`;
@@ -186,6 +189,25 @@ async function run(scenario) {
     return;
   }
   const provider = wallet.provider;
+  // These are examples of what not to sign. A real wallet gets them only on a
+  // test network, so a wrong click here can never cost real money.
+  if (!isDemo(wallet)) {
+    let chainId = NaN;
+    try {
+      chainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
+    } catch {
+      // unknown network: treated as real
+    }
+    if (!TESTNETS[chainId]) {
+      report({
+        scenario,
+        ok: false,
+        code: 'not sent',
+        message: `${wallet.info.name} is on ${chainName(chainId)}. Switch it to a test network first: the demo sends nothing to a real network.`,
+      });
+      return;
+    }
+  }
   try {
     const request = SCENARIOS[scenario]();
     state.sent = JSON.parse(JSON.stringify(request)); // what the site asked for
@@ -202,7 +224,18 @@ for (const button of document.querySelectorAll('[data-scenario]')) {
 
 // ── Real wallets: connect first, and prefer a test network ────────────────
 
-const CHAIN_NAMES = { 1: 'Ethereum mainnet', 11155111: 'Sepolia test network' };
+const TESTNETS = {
+  11155111: 'Sepolia test network',
+  17000: 'Holesky test network',
+  97: 'BNB Chain test network',
+  80002: 'Polygon Amoy test network',
+  421614: 'Arbitrum Sepolia test network',
+  84532: 'Base Sepolia test network',
+  11155420: 'Optimism Sepolia test network',
+};
+const MAINNETS = { 1: 'Ethereum mainnet', 56: 'BNB Chain', 137: 'Polygon', 42161: 'Arbitrum', 8453: 'Base', 10: 'Optimism' };
+const chainName = (id) =>
+  TESTNETS[id] || MAINNETS[id] || (Number.isFinite(id) ? `chain ${id}` : 'an unknown network');
 
 async function connect() {
   const wallet = currentWallet();
@@ -217,7 +250,9 @@ async function connect() {
     const chainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
     walletEl.textContent = isDemo(wallet)
       ? 'Demo wallet: no keys, no real funds. It only records which requests reach it.'
-      : `Connected with ${wallet.info.name}: ${ME.slice(0, 6)}…${ME.slice(-4)} on ${CHAIN_NAMES[chainId] || `chain ${chainId}`}`;
+      : `Connected with ${wallet.info.name}: ${ME.slice(0, 6)}…${ME.slice(-4)} on ${chainName(chainId)}${
+          TESTNETS[chainId] ? ' (test network, ready)' : '. Real network: the buttons above will not send anything until you switch to a test network.'
+        }`;
     state.account = ME;
     state.chainId = chainId;
   } catch (error) {
