@@ -33,6 +33,24 @@ function hostOf(origin) {
   }
 }
 
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** 0x9f3a…c21e; a click shows the whole address and copies it. */
+function addressButton(address) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'address';
+  button.dataset.full = address;
+  button.title = `${address}\nClick to show and copy`;
+  button.textContent = `${address.slice(0, 8)}…${address.slice(-6)}`;
+  button.addEventListener('click', () => {
+    button.classList.add('full');
+    button.textContent = address;
+    navigator.clipboard?.writeText(address).catch(() => {});
+  });
+  return button;
+}
+
 function render(record, result) {
   document.body.dataset.risk = result.risk;
   $('badge').textContent = BADGE[result.risk];
@@ -46,8 +64,12 @@ function render(record, result) {
       const dt = document.createElement('dt');
       dt.textContent = f.label;
       const dd = document.createElement('dd');
-      dd.textContent = f.value;
-      if (f.mono) dd.classList.add('mono');
+      if (ADDRESS.test(f.value)) {
+        dd.append(addressButton(f.value));
+      } else {
+        dd.textContent = f.value;
+        if (f.mono) dd.classList.add('mono');
+      }
       if (f.tone) dd.dataset.tone = f.tone;
       if (f.note) {
         const note = document.createElement('span');
@@ -81,7 +103,6 @@ function render(record, result) {
   $('reject').classList.toggle('primary', safeIsReject);
   $('allow').classList.toggle('primary', !safeIsReject);
   $('allow').textContent = safeIsReject ? 'Continue anyway' : 'Continue to wallet';
-  (safeIsReject ? $('reject') : $('allow')).focus();
 }
 
 // ── On-device explanation: starts by itself, nothing leaves the computer ──
@@ -101,6 +122,7 @@ async function runLocal(result, host) {
 
   if (status === 'unavailable') {
     text.classList.remove('pending');
+    text.classList.add('muted');
     text.textContent = 'On-device AI is not available in this browser. The facts below do not depend on it.';
     return;
   }
@@ -136,11 +158,12 @@ async function runLocal(result, host) {
     text.classList.remove('pending');
     text.textContent = out.text;
     setChip($('local-chip'), out.source, out.ms);
-    meta.textContent = 'Gemini Nano in Chrome. Nothing about this request left your computer.';
+    meta.textContent = 'Gemini Nano, running in Chrome. Nothing about this request left your computer.';
     meta.hidden = false;
     document.body.dataset.local = 'done';
   } catch (error) {
     text.classList.remove('pending');
+    text.classList.add('muted');
     text.textContent = 'The on-device model could not answer this time. The facts below do not depend on it.';
     document.body.dataset.local = 'error';
     console.warn('[Guardian] on-device explanation failed', error);
@@ -170,7 +193,7 @@ function wireCloud(result, host) {
       $('cloud-result').hidden = false;
       setChip($('cloud-chip'), out.source, out.ms);
       ask.hidden = true;
-      $('cloud-consent').textContent = 'Analyzed by Gemini through Firebase AI Logic, at your request.';
+      $('cloud-consent').textContent = 'Gemini through Firebase AI Logic, at your request.';
       document.body.dataset.cloud = 'done';
     } catch (error) {
       const message = String((error && error.message) || error);

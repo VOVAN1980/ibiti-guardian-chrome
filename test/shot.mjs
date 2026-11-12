@@ -4,7 +4,7 @@ import path from 'node:path';
 import puppeteer from 'puppeteer';
 
 const [scenario = 'claim', output = 'review.png'] = process.argv.slice(2);
-const EXT = path.resolve('dist/extension');
+const EXT = path.resolve(process.env.GUARDIAN_OUT || 'dist/extension');
 const browser = await puppeteer.launch({ headless: true, pipe: true, enableExtensions: [EXT] });
 await browser.waitForTarget((t) => t.type() === 'service_worker');
 const page = await browser.newPage();
@@ -14,7 +14,7 @@ const before = new Set(browser.targets());
 await page.click(`[data-scenario="${scenario}"]`);
 const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
 const review = await target.asPage();
-await review.setViewport({ width: 420, height: 680, deviceScaleFactor: 2 });
+await review.setViewport({ width: 420, height: 760, deviceScaleFactor: 2 });
 await review.waitForFunction(() => document.getElementById('badge').textContent !== '');
 if (process.argv.includes('--cloud')) {
   await review.click('#cloud-ask');

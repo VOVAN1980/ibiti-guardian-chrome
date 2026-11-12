@@ -2,7 +2,9 @@
 import { build } from 'esbuild';
 import { cp, mkdir, rm } from 'node:fs/promises';
 
-const out = 'dist/extension';
+// GUARDIAN_OUT lets tests build elsewhere, so a copy loaded in Chrome from
+// dist/extension is not replaced in the middle of someone's session.
+const out = process.env.GUARDIAN_OUT || 'dist/extension';
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 await cp('extension', out, { recursive: true });

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
 
-const EXT = path.resolve('dist/extension');
+const EXT = path.resolve(process.env.GUARDIAN_OUT || 'dist/extension');
 const DEMO = process.env.DEMO_URL || 'http://127.0.0.1:5179/demo/index.html?mock=1';
 
 const browser = await puppeteer.launch({
@@ -53,10 +53,11 @@ async function openReview(scenario) {
     headline: document.getElementById('headline').textContent,
     origin: document.getElementById('origin').textContent,
     facts: Object.fromEntries(
-      [...document.querySelectorAll('.fact')].map((row) => [
-        row.querySelector('dt').textContent,
-        row.querySelector('dd').childNodes[0].textContent,
-      ]),
+      [...document.querySelectorAll('.fact')].map((row) => {
+        const dd = row.querySelector('dd');
+        const address = dd.querySelector('.address');
+        return [row.querySelector('dt').textContent, address ? address.dataset.full : dd.childNodes[0].textContent];
+      }),
     ),
     reasons: [...document.querySelectorAll('#reasons li')].map((li) => li.textContent),
   }));

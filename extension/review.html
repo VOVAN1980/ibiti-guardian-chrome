@@ -8,18 +8,23 @@
   </head>
   <body data-risk="caution">
     <header class="bar">
-      <img class="logo" src="icons/icon48.png" alt="" width="28" height="28" />
-      <span class="brand">IBITI Guardian</span>
+      <img class="logo" src="icons/icon48.png" alt="" width="30" height="30" />
+      <span class="brand">IBITI Guardian<small>Transaction firewall</small></span>
       <span class="badge" id="badge"></span>
     </header>
 
     <main>
-      <p class="origin"><strong id="origin"></strong> wants your wallet to confirm:</p>
-      <h1 id="headline">Checking the request…</h1>
+      <section class="hero">
+        <p class="origin"><strong id="origin"></strong> wants your wallet to confirm</p>
+        <h1 id="headline">Checking the request…</h1>
+      </section>
 
       <section class="ai" id="local" aria-live="polite">
         <div class="ai-head">
-          <span class="ai-title">In plain words</span>
+          <span class="ai-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /><path d="M9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></svg>
+            In plain words
+          </span>
           <span class="chip" id="local-chip" hidden></span>
         </div>
         <p class="ai-text" id="local-text"></p>
@@ -41,19 +46,22 @@
 
       <section class="ai cloud" id="cloud">
         <div class="ai-head">
-          <span class="ai-title">Deeper analysis</span>
+          <span class="ai-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 11.47 1.5A3.75 3.75 0 0 1 17.5 18z" /></svg>
+            Deeper analysis
+          </span>
           <span class="chip" id="cloud-chip" hidden></span>
         </div>
         <div id="cloud-result" hidden>
           <p class="ai-text" id="cloud-summary"></p>
           <p class="ai-sub" id="cloud-confirm"></p>
-          <p class="ai-sub" id="cloud-pattern"></p>
+          <span class="pattern" id="cloud-pattern"></span>
           <ul class="checks" id="cloud-checks"></ul>
         </div>
         <button class="quiet" id="cloud-ask" type="button">Ask cloud AI</button>
         <p class="ai-meta" id="cloud-consent">
-          Sends the decoded details above (site, action, token, amount, the other party’s address) to Google
-          Gemini through Firebase. Your wallet address is not sent. Nothing is sent unless you press the button.
+          Optional. Sends the decoded details above (site, action, token, amount, the other party’s address) to
+          Gemini through Firebase. Your wallet address is not sent.
         </p>
       </section>
     </main>
@@ -63,7 +71,10 @@
         <button id="reject" type="button">Reject</button>
         <button id="allow" type="button">Continue anyway</button>
       </div>
-      <p class="hold">Guardian is holding this request. Your wallet has not seen it yet.</p>
+      <p class="hold">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+        Held by Guardian. Your wallet has not seen this request.
+      </p>
     </footer>
 
     <script type="module" src="review.js"></script>
