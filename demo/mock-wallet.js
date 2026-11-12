@@ -76,12 +76,22 @@
     removeListener() {},
   };
 
-  window.ethereum = provider;
+  // A real wallet keeps window.ethereum. The demo wallet takes it only when it
+  // is free, or when a test asks for it with ?mock=1. Either way it introduces
+  // itself through EIP-6963 below, which is how the demo site finds it.
+  const query = new URLSearchParams(location.search);
+  if (query.has('mock') || !window.ethereum) {
+    try {
+      window.ethereum = provider;
+    } catch {
+      // another wallet holds it
+    }
+  }
 
   // Some real wallets replace request() after start-up. With ?swap=1 the demo
   // wallet does the same, both by assignment and by redefining the property,
   // to prove that Guardian keeps guarding the new function.
-  const swapMode = new URLSearchParams(location.search).get('swap');
+  const swapMode = query.get('swap');
   if (swapMode) {
     setTimeout(() => {
       const inner = provider.request;
