@@ -7,7 +7,7 @@
     "build": "node build.mjs",
     "test": "node --test test/analyzer.test.js",
     "demo": "python -m http.server 5179 --bind 127.0.0.1",
-    "test:e2e": "node build.mjs && node test/e2e.mjs && node test/swap.mjs && node test/tamper.mjs"
+    "test:e2e": "node build.mjs && node test/e2e.mjs && node test/swap.mjs && node test/tamper.mjs && node test/site.mjs"
   },
   "dependencies": {
     "esbuild": "^0.28.2",

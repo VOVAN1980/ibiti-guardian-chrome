@@ -67,6 +67,19 @@ const SCENARIOS = {
 };
 
 const logEl = document.getElementById('log');
+
+// Is anything standing between this site and the wallet?
+const guardEl = document.getElementById('guard');
+if (window.__ibitiGuardianPreview) {
+  guardEl.textContent = 'Guardian preview is on: nothing to install';
+  guardEl.dataset.state = 'on';
+} else if (window.__ibitiGuardian) {
+  guardEl.textContent = 'IBITI Guardian extension is on';
+  guardEl.dataset.state = 'on';
+} else {
+  guardEl.textContent = 'Guardian is off: requests go straight to the wallet';
+  guardEl.dataset.state = 'off';
+}
 const state = (window.__dapp = { last: null, history: [], wallets: [] });
 
 // ── Which wallet ───────────────────────────────────────────────────────────
