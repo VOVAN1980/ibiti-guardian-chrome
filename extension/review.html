@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IBITI Guardian</title>
+    <link rel="stylesheet" href="review.css" />
+  </head>
+  <body data-risk="caution">
+    <header class="bar">
+      <img class="logo" src="icons/icon48.png" alt="" width="28" height="28" />
+      <span class="brand">IBITI Guardian</span>
+      <span class="badge" id="badge"></span>
+    </header>
+
+    <main>
+      <p class="origin"><strong id="origin"></strong> wants your wallet to confirm:</p>
+      <h1 id="headline">Checking the request…</h1>
+
+      <dl class="facts" id="facts"></dl>
+
+      <section class="why" id="why" hidden>
+        <h2>Why this matters</h2>
+        <ul id="reasons"></ul>
+      </section>
+
+      <section class="message" id="message" hidden>
+        <h2>Message to sign</h2>
+        <pre id="message-text"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <div class="actions">
+        <button id="reject" type="button">Reject</button>
+        <button id="allow" type="button">Continue anyway</button>
+      </div>
+      <p class="hold">Guardian is holding this request. Your wallet has not seen it yet.</p>
+    </footer>
+
+    <script type="module" src="review.js"></script>
+  </body>
+</html>

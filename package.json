@@ -1,0 +1,21 @@
+{
+  "name": "guardian-chrome",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/analyzer.test.js",
+    "demo": "python -m http.server 5179 --bind 127.0.0.1",
+    "test:e2e": "node build.mjs && node test/e2e.mjs"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "firebase": "^13.3.0"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.17.0"
+  },
+  "description": "IBITI Guardian for Chrome: explains wallet requests in plain language before they reach your wallet.",
+  "license": "Apache-2.0"
+}
