@@ -91,7 +91,7 @@ await step('a dangerous approve is held and described before the wallet sees it'
   assert.equal(await walletLog(), 0, 'Reject must keep the request away from the wallet');
 });
 
-await step('Continue forwards the same request to the wallet', async () => {
+await step('Continue forwards the request to the wallet unchanged', async () => {
   const { review } = await openReview('claim');
   assert.equal(await walletLog(), 0);
   await review.click('#allow');
@@ -99,6 +99,12 @@ await step('Continue forwards the same request to the wallet', async () => {
   const last = await dappLast();
   assert.equal(last.ok, true);
   assert.equal(await walletLog(), 1);
+  const { sent, received } = await page.evaluate(() => ({
+    sent: window.__dapp.sent,
+    received: window.__mockWalletLog[0],
+  }));
+  // Same method, same recipient, same amount, same calldata: byte for byte.
+  assert.deepEqual(received, sent);
 });
 
 await step('closing the review window counts as Reject', async () => {
@@ -158,6 +164,19 @@ await step('cloud analysis runs only after the user asks for it', async () => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     assert.deepEqual(calls, [], 'no network request before the user asks for the cloud');
 
+    // This test browser has no on-device model. Guardian must still show the
+    // facts and keep holding the request: no AI never means "let it through".
+    const noAi = await review.evaluate(() => ({
+      local: document.body.dataset.local,
+      headline: document.getElementById('headline').textContent,
+      facts: document.querySelectorAll('.fact').length,
+    }));
+    assert.equal(noAi.local, 'unavailable');
+    assert.equal(noAi.headline, 'Unlimited spending permission for USDT');
+    assert.ok(noAi.facts >= 4);
+    assert.equal(await dappHistory(), expectedHistory, 'still held without AI');
+    assert.equal(await walletLog(), 1, 'nothing reached the wallet without a decision');
+
     await review.click('#cloud-ask');
     await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 40000 });
     const cloudError = await review.evaluate(() => document.body.dataset.cloudError || '');
@@ -185,6 +204,28 @@ await step('cloud analysis runs only after the user asks for it', async () => {
     expectedHistory += 1;
     await waitForHistory(expectedHistory);
   }
+});
+
+await step('if Guardian cannot be reached, the request is refused, not passed', async () => {
+  // Reloading the extension cuts this page off from it, as an update or a
+  // crash would. The page still has the wrapper; it must fail closed.
+  const worker = await browser
+    .targets()
+    .find((t) => t.type() === 'service_worker')
+    .worker();
+  await worker.evaluate(() => chrome.runtime.reload()).catch(() => {});
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  const reviewsBefore = browser.targets().filter((t) => t.url().includes('/review.html')).length;
+  await page.click('[data-scenario="claim"]');
+  expectedHistory += 1;
+  await waitForHistory(expectedHistory);
+  const last = await dappLast();
+  assert.equal(last.ok, false);
+  assert.equal(last.code, 4001);
+  assert.match(last.message, /could not review/);
+  assert.equal(await walletLog(), 1, 'the wallet did not receive it');
+  assert.equal(browser.targets().filter((t) => t.url().includes('/review.html')).length, reviewsBefore);
 });
 
 await browser.close();

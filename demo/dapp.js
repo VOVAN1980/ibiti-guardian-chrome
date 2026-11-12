@@ -87,7 +87,9 @@ async function run(scenario) {
     return;
   }
   try {
-    const result = await provider.request(SCENARIOS[scenario]());
+    const request = SCENARIOS[scenario]();
+    state.sent = JSON.parse(JSON.stringify(request)); // what the site asked for
+    const result = await provider.request(request);
     report({ scenario, ok: true, result });
   } catch (error) {
     report({ scenario, ok: false, code: error && error.code, message: String((error && error.message) || error) });
