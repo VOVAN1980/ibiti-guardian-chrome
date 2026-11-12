@@ -3,3 +3,6 @@ dist/
 # App Check debug token and local Firebase settings: never committed.
 src/config.js
 *.local.js
+
+# Firebase CLI deploy cache
+.firebase/
