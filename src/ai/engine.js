@@ -4,8 +4,8 @@
 //   on device  InferenceMode.ONLY_ON_DEVICE  Gemini Nano in Chrome; no network
 //   in cloud   InferenceMode.ONLY_IN_CLOUD   Gemini through Firebase, only
 //                                            after the user asks for it
-// With "always allow cloud" switched on, PREFER_ON_DEVICE gives the SDK's own
-// fallback: device first, cloud when the device model is not available.
+// There is no automatic fallback from device to cloud: the cloud is only ever
+// used after the user presses the button.
 
 import { initializeApp } from 'firebase/app';
 import { GoogleAIBackend, InferenceMode, Schema, getAI, getGenerativeModel } from 'firebase/ai';
@@ -123,29 +123,5 @@ export async function analyzeInCloud(prompt) {
     data,
     ms: Math.round(performance.now() - started),
     source: result.response.inferenceSource || 'in_cloud',
-  };
-}
-
-/**
- * Hybrid with the SDK's own fallback: on device when available, else cloud.
- * Used only when the user has switched on "always allow cloud".
- */
-export async function explainHybrid(prompt, onText) {
-  const model = getGenerativeModel(inCloud(), {
-    mode: InferenceMode.PREFER_ON_DEVICE,
-    onDeviceParams: ON_DEVICE_PARAMS,
-  });
-  const started = performance.now();
-  const result = await model.generateContentStream(prompt);
-  let text = '';
-  for await (const chunk of result.stream) {
-    text += chunk.text();
-    onText(text);
-  }
-  const response = await result.response;
-  return {
-    text: text.trim(),
-    ms: Math.round(performance.now() - started),
-    source: response.inferenceSource || 'unknown',
   };
 }
