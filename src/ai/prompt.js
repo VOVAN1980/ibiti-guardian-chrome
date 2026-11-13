@@ -31,12 +31,12 @@ export function meaning(result, host) {
   if (s.action === 'approve') {
     const who = s.spenderName
       ? `${s.spenderName}, a well-known service,`
-      : `an unknown address${note('Spender') ? ` (a ${note('Spender')})` : ''}, not you,`;
+      : `someone else, an unknown address${note('Spender') ? ` (a ${note('Spender')})` : ''},`;
     const what = s.amount === 'Unlimited' ? `any amount of ${symbol}` : `up to ${s.amount}`;
     return `If you confirm, ${who} gets permission to take ${what} out of your wallet, at any time, without asking you again, until you revoke it.`;
   }
   if (s.action === 'approveAll') {
-    const who = s.operatorName ? `${s.operatorName}, a well-known service,` : 'an unknown address, not you,';
+    const who = s.operatorName ? `${s.operatorName}, a well-known service,` : 'someone else, an unknown address,';
     return `If you confirm, ${who} gets permission to move every item you own in this collection, now or later, until you revoke it.`;
   }
   if (s.action === 'revoke' || s.action === 'revokeAll') {
