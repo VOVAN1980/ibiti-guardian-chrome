@@ -107,7 +107,7 @@ function render(record, result) {
   $('allow').textContent = safeIsReject ? 'Continue anyway' : 'Continue to wallet';
 }
 
-// ── On-device explanation: starts by itself, nothing leaves the computer ──
+// ── On-device explanation: starts by itself, no AI service is contacted ──
 
 function setChip(element, source, ms) {
   element.dataset.source = source;
@@ -160,7 +160,7 @@ async function runLocal(result, host) {
     text.classList.remove('pending');
     text.textContent = out.text;
     setChip($('local-chip'), out.source, out.ms);
-    meta.textContent = 'Gemini Nano, running in Chrome. Nothing about this request left your computer.';
+    meta.textContent = 'Gemini Nano, running in Chrome. Written on your computer: nothing was sent to an AI service.';
     meta.hidden = false;
     document.body.dataset.local = 'done';
   } catch (error) {

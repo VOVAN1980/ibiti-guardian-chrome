@@ -29,7 +29,7 @@ Built for #BuildHybridAI 2026.
    level — *High risk*, *Check carefully*, *No red flags found* — is decided by
    code, never by a model.
 3. **Gemini explains it, on your device.** Gemini Nano turns the facts into
-   two plain sentences. Nothing about the request leaves the computer.
+   two plain sentences on your own computer. No AI service is contacted.
 4. **A deeper look, only if you ask.** One button sends the decoded facts
    (never your own wallet address) to Gemini in the cloud for a structured
    second opinion.
@@ -53,7 +53,7 @@ rather than by an automatic fallback:
 | Model | Gemini Nano, built into Chrome | Gemini (`gemini-3.5-flash-lite`) |
 | Mode | `InferenceMode.ONLY_ON_DEVICE`, streaming | `InferenceMode.ONLY_IN_CLOUD`, JSON schema |
 | When | By itself, as soon as the window opens | Only after the user presses **Ask cloud AI** |
-| What leaves the computer | Nothing | The decoded facts; never the user's address |
+| Sent to an AI service | Nothing | The decoded facts; never the user's address |
 | Protected by | — (no network call) | Firebase App Check |
 
 - Each answer shows where it ran and how long it took (*On device · 12.0 s*,
@@ -169,6 +169,11 @@ On-device by default. The cloud is contacted only after an explicit click, and
 receives the decoded facts of the request — the site, the action, the token,
 the amount, the other party's address — never the user's own address.
 Guardian has no server of its own and keeps no history.
+
+To describe a request, Guardian reads public context through your wallet's
+own connection, the way the wallet itself would: whether the other party is a
+contract, the token's symbol and decimals, and your balance of what is being
+moved.
 
 ## Limits
 
