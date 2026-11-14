@@ -9,3 +9,9 @@ src/config.js
 
 # Video working files (script, recordings)
 video/
+
+# The judges' App Check debug token (tools/judges.mjs). Never committed.
+tools/judges-token.local.txt
+
+# Served by the hosted demo but never committed (the judges' download).
+site-private/

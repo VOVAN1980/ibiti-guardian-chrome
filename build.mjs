@@ -94,6 +94,9 @@ const guardianDir = path.join(site, 'guardian');
 await rm(site, { recursive: true, force: true });
 await mkdir(guardianDir, { recursive: true });
 await cp('demo', site, { recursive: true });
+// Served but not in the repository: the judges' test build at an unlisted
+// address (tools/judges.mjs). Copied in on every build so a deploy keeps it.
+if (existsSync('site-private')) await cp('site-private', site, { recursive: true });
 await cp('extension/review.html', path.join(guardianDir, 'review.html'));
 await cp('extension/review.css', path.join(guardianDir, 'review.css'));
 await cp('extension/icons', path.join(guardianDir, 'icons'), { recursive: true });
