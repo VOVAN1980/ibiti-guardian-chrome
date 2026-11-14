@@ -207,6 +207,27 @@ await step('cloud analysis runs only after the user asks for it', async () => {
   }
 });
 
+await step('the toolbar panel says Guardian is on, what this build can do, and opens the test page', async () => {
+  const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
+  const id = new URL(worker.url()).host;
+  const panel = await browser.newPage();
+  await panel.goto(`chrome-extension://${id}/popup.html`, { waitUntil: 'load' });
+  await panel.waitForFunction(
+    () => !/Checking/.test(document.getElementById('nano').textContent) && !/Checking/.test(document.getElementById('cloud').textContent),
+  );
+  const text = await panel.evaluate(() => document.body.innerText);
+  assert.match(text, /Guardian is watching wallet requests on every site/);
+  assert.match(text, /Try it on the test page/);
+  const before = new Set(browser.targets());
+  await panel.click('#try');
+  const opened = await browser.waitForTarget(
+    (t) => !before.has(t) && t.type() === 'page' && t.url().startsWith('https://ibiti-guardian-chrome.web.app'),
+    { timeout: 10000 },
+  );
+  await (await opened.asPage()).close();
+  await panel.close().catch(() => {}); // the panel closes itself after opening the page
+});
+
 await step('if Guardian cannot be reached, the request is refused, not passed', async () => {
   // Reloading the extension cuts this page off from it, as an update or a
   // crash would. The page still has the wrapper; it must fail closed.

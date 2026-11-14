@@ -1,0 +1,162 @@
+:root {
+  color-scheme: dark;
+  --bg: #06090e;
+  --surface: #0e131b;
+  --line: #1f2836;
+  --text: #f1f4f9;
+  --text-2: #a9b4c4;
+  --text-3: #6d798b;
+  --brand: #19d3e6;
+  --ok: #37d7a6;
+  --warn: #ffb547;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  width: 340px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.brand small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.on {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #14503f;
+  background: #061d17;
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.on::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  vertical-align: 1px;
+}
+
+main {
+  padding: 14px;
+}
+
+.lead {
+  color: var(--text-2);
+}
+
+.lead strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.status {
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.status div {
+  padding: 9px 12px;
+}
+
+.status div + div {
+  border-top: 1px solid var(--line);
+}
+
+.status dt {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.status dd {
+  font-weight: 600;
+}
+
+.status .ok {
+  color: var(--ok);
+}
+
+.status .warn {
+  color: var(--warn);
+}
+
+.status .off {
+  color: var(--text-2);
+}
+
+.primary {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #04121a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+.primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.hint b {
+  color: var(--text-2);
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+footer a {
+  color: var(--brand);
+}
