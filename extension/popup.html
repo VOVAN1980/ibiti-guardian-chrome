@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" translate="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="google" content="notranslate" />
+    <title>IBITI Guardian</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <img class="logo" src="icons/icon48.png" alt="" width="30" height="30" />
+      <span class="brand">IBITI Guardian<small>Transaction firewall</small></span>
+      <span class="on" id="on">On</span>
+    </header>
+
+    <main>
+      <p class="lead">
+        <strong>Guardian is watching wallet requests on every site.</strong>
+        When a page asks your wallet to sign or send, Guardian holds the request and opens its own window before your
+        wallet sees it. There is nothing to press here.
+      </p>
+
+      <dl class="status">
+        <div>
+          <dt>Facts and risk level</dt>
+          <dd class="ok">Decided by code, always on</dd>
+        </div>
+        <div>
+          <dt>Gemini Nano, on this computer</dt>
+          <dd id="nano">Checking…</dd>
+        </div>
+        <div>
+          <dt>Cloud analysis, only when you ask</dt>
+          <dd id="cloud">Checking…</dd>
+        </div>
+      </dl>
+
+      <button class="primary" id="try" type="button">Try it on the test page</button>
+      <p class="hint">
+        Opens our demo site with a demo wallet (no keys, no funds). Press <b>Claim airdrop</b> there and Guardian’s
+        window appears.
+      </p>
+    </main>
+
+    <footer>
+      <a href="https://github.com/VOVAN1980/ibiti-guardian-chrome" target="_blank" rel="noreferrer">Source code</a>
+      <span id="version"></span>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

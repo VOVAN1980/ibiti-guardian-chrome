@@ -94,6 +94,13 @@ npm run build        # dist/extension (the extension) and dist/site (the hosted 
 Load `dist/extension` in `chrome://extensions` (Developer mode → Load
 unpacked). Requires Chrome 139 or newer.
 
+Guardian needs no clicks: it opens its own window when a page asks the wallet
+to sign or send. The toolbar icon opens a small panel that says Guardian is on,
+whether Gemini Nano and the cloud analysis are available in this build, and
+opens the test page.
+
+<img src="docs/popup.png" alt="The toolbar panel" width="300">
+
 `src/config.js` is not in the repository. It needs a Firebase project with AI
 Logic (Gemini Developer API) enabled; the cloud analysis in the extension also
 needs an App Check debug token registered for that project (extension pages

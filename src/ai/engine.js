@@ -13,6 +13,7 @@ import { GoogleAIBackend, InferenceMode, Schema, getAI, getGenerativeModel } fro
 // to App Check in different ways (see appcheck.ext.js and appcheck.web.js).
 import { cloudReady, startAppCheck } from 'guardian-appcheck';
 import { firebaseConfig } from 'guardian-config';
+import { ON_DEVICE_PARAMS, deviceModelStatus } from './device.js';
 
 /** False when this build has no way to pass App Check, so cloud is off. */
 export { cloudReady };
@@ -41,22 +42,7 @@ function inCloud() {
   return cloudAi;
 }
 
-const ON_DEVICE_PARAMS = {
-  createOptions: {
-    expectedInputs: [{ type: 'text', languages: ['en'] }],
-    expectedOutputs: [{ type: 'text', languages: ['en'] }],
-  },
-};
-
-/** 'available' | 'downloadable' | 'downloading' | 'unavailable' */
-export async function deviceModelStatus() {
-  if (!('LanguageModel' in self)) return 'unavailable';
-  try {
-    return await self.LanguageModel.availability(ON_DEVICE_PARAMS.createOptions);
-  } catch {
-    return 'unavailable';
-  }
-}
+export { deviceModelStatus };
 
 /** Starts the one-time model download. Needs a user gesture. */
 export async function downloadDeviceModel(onProgress) {

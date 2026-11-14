@@ -39,7 +39,7 @@ const extension = {
 // Content scripts are classic scripts: one self-contained file each.
 await build({ ...extension, entryPoints: ['src/inpage.js', 'src/bridge.js'], format: 'iife' });
 // The service worker and extension pages are ES modules.
-await build({ ...extension, entryPoints: ['src/background.js', 'src/review.js'], format: 'esm' });
+await build({ ...extension, entryPoints: ['src/background.js', 'src/review.js', 'src/popup.js'], format: 'esm' });
 
 // ── Hosted demo ─────────────────────────────────────────────────────────────
 // The public site gets the Firebase web config (public by design) and the
