@@ -10,8 +10,9 @@
 // GitHub. Output: dist/judges/ and dist/IBITI-Guardian-judges.zip (dist/ is ignored).
 
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 
 const token = process.argv[2] || '';
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
@@ -69,3 +70,16 @@ execFileSync('powershell.exe', ['-NoProfile', '-Command', `Compress-Archive -Pat
   stdio: 'inherit',
 });
 console.log(`\n${ZIP} ready (version ${version}).`);
+
+// The download for the judges: site-private/ is served by the hosted demo
+// (build.mjs copies it in) but is not in the repository, under a random
+// directory that nothing links to. The same address is kept on every rebuild.
+const DROP = 'site-private/j';
+await mkdir(DROP, { recursive: true });
+let dir = (await readdir(DROP, { withFileTypes: true })).find((e) => e.isDirectory())?.name;
+if (!dir) {
+  dir = randomBytes(16).toString('hex');
+  await mkdir(`${DROP}/${dir}`);
+}
+await copyFile(ZIP, `${DROP}/${dir}/IBITI-Guardian-judges.zip`);
+console.log(`Served after the next deploy at /j/${dir}/IBITI-Guardian-judges.zip`);
