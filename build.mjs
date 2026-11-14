@@ -23,6 +23,24 @@ const config = await import(pathToFileURL(configPath).href);
 const common = { bundle: true, logLevel: 'info', legalComments: 'none' };
 
 // ── Extension ───────────────────────────────────────────────────────────────
+// GUARDIAN_EXT_TOKEN builds the extension with another App Check debug token
+// (the judges' build, see tools/judges.mjs), so our own never leaves this machine.
+const extToken = process.env.GUARDIAN_EXT_TOKEN || '';
+let extConfigPath = configPath;
+if (extToken) {
+  extConfigPath = path.resolve('dist/.ext-config.mjs');
+  await mkdir('dist', { recursive: true });
+  await writeFile(
+    extConfigPath,
+    [
+      `export const firebaseConfig = ${JSON.stringify(config.firebaseConfig)};`,
+      `export const appCheckDebugToken = ${JSON.stringify(extToken)};`,
+      'export const recaptcha = null;',
+      '',
+    ].join('\n'),
+  );
+}
+
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 await cp('extension', out, { recursive: true });
@@ -32,7 +50,7 @@ const extension = {
   target: 'chrome139',
   outdir: out,
   alias: {
-    'guardian-config': configPath,
+    'guardian-config': extConfigPath,
     'guardian-appcheck': path.resolve('src/ai/appcheck.ext.js'),
   },
 };
@@ -40,6 +58,20 @@ const extension = {
 await build({ ...extension, entryPoints: ['src/inpage.js', 'src/bridge.js'], format: 'iife' });
 // The service worker and extension pages are ES modules.
 await build({ ...extension, entryPoints: ['src/background.js', 'src/review.js', 'src/popup.js'], format: 'esm' });
+
+if (extToken) {
+  await rm(extConfigPath, { force: true });
+  // Our own token must not be in a build made for someone else.
+  if (config.appCheckDebugToken && config.appCheckDebugToken !== extToken) {
+    for (const entry of await readdir(out, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const file = path.join(entry.parentPath ?? entry.path, entry.name);
+      if ((await readFile(file)).includes(config.appCheckDebugToken)) {
+        throw new Error(`Our own App Check debug token ended up in ${file}.`);
+      }
+    }
+  }
+}
 
 // ── Hosted demo ─────────────────────────────────────────────────────────────
 // The public site gets the Firebase web config (public by design) and the
