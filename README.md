@@ -9,6 +9,10 @@ only when you ask — and then you decide.
 (a simulation with a demo wallet that has no keys and no funds; the extension
 does the same check in front of your real wallet).
 
+**Video (2:54):** https://youtu.be/1xGWgzLbLEM · **Devpost:** https://devpost.com/software/ibiti-guardian-for-chrome-know-what-you-sign
+
+<a href="https://youtu.be/1xGWgzLbLEM"><img src="docs/video.jpg" alt="Watch the video: IBITI Guardian for Chrome — know what you sign" width="640"></a>
+
 <p>
   <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval: facts decoded by code, explained on device by Gemini Nano" width="360">
   &nbsp;
