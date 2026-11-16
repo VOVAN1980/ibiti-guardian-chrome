@@ -24,13 +24,17 @@
 // These checks are deliberately narrow: they catch the mistakes code can
 // verify. They cannot prove that an explanation is right.
 
+import { ownAddresses } from '../analyzer/index.js';
 import { CHAINS } from '../analyzer/registry.js';
 
 // Requests the analyzer could not decode.
 export const UNDECODED = new Set(['contractCall', 'typedData', 'unknown', 'blindSign', 'deploy']);
 
 export const isUndecoded = (result) =>
-  UNDECODED.has(result.kind) || (result.kind === 'message' && result.subject && result.subject.readable === false);
+  UNDECODED.has(result.kind) ||
+  (result.kind === 'message' && Boolean(result.subject) && result.subject.readable === false) ||
+  // A batch is only as decoded as its least decoded call.
+  (result.kind === 'batch' && (!Array.isArray(result.parts) || result.parts.length === 0 || result.parts.some(isUndecoded)));
 
 // ── Tokens ──────────────────────────────────────────────────────────────────
 
@@ -439,6 +443,11 @@ const SAYS_VERIFIED_OTHER = [
 // More at stake than this request covers: every token, every collection,
 // the whole wallet. (Guardian's own rule from day one: say who, how much and
 // why, never "all your funds will be stolen".)
+// "… without moving any assets", "… without touching any of your tokens".
+// Only right before the words: "without asking, take any of your tokens" is
+// not a negation of the taking.
+const WITHOUT_DOING = /\bwithout\s+(?:moving|sending|touching|taking|transferring|spending|giving away|losing|risking)\s*$/i;
+
 const WALLET_WIDE = [
   // (not "all of your NFTs in this collection": that is this request's scope)
   /\b(?:all|every|any|each)\s+(?:of\s+)?(?:your\s+|the\s+)?(?:other\s+)?(?:nfts?|tokens?|assets?|coins?|funds|crypto|collections?|holdings|savings|money)\b(?![^.;]{0,40}\b(?:this|that|the same|a specific|a single|a particular|one)\s+(?:collection|token|contract)\b)/i,
@@ -619,6 +628,8 @@ export function checkText(text, result, truth = groundTruth(result)) {
     for (const m of plain.matchAll(re)) {
       const before = clauseBefore(plain, m.index);
       if (ADVICE.test(before)) continue;
+      // "without moving any assets": a negation, right before it.
+      if (WITHOUT_DOING.test(before)) continue;
       if (NEGATED.test(before) && !/\b(?:no longer|any ?more|any longer)\b/i.test(before)) continue;
       if (!truth.lower.includes(m[0].toLowerCase())) return fail(TOO_MUCH, m[0]);
     }
@@ -755,28 +766,8 @@ export function scrubResult(result, own) {
   return walk(result);
 }
 
-/** The user's own address(es): the wallet's accounts and the request's signer. */
-export function ownAddresses(record) {
-  const out = new Set();
-  const add = (v) => {
-    if (typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v)) out.add(v.toLowerCase());
-  };
-  const params = Array.isArray(record && record.params) ? record.params : [];
-  const method = String((record && record.method) || '');
-  // The wallet's connected accounts, read by the in-page guard.
-  const accounts = record && record.enrich && Array.isArray(record.enrich.accounts) ? record.enrich.accounts : [];
-  accounts.forEach(add);
-  if (/^eth_send|^wallet_sendCalls|^eth_signTransaction/.test(method)) {
-    add(params[0] && params[0].from);
-  } else if (/sign/i.test(method)) {
-    // personal_sign(message, address), eth_sign(address, data),
-    // eth_signTypedData*(address, data): the account is the address param.
-    // Wherever else it appears (a typed-data "owner", a message text), the
-    // scrub replaces it too.
-    params.slice(0, 2).forEach(add);
-  }
-  return [...out];
-}
+// The user's own address(es): decided by the analyzer, which needs them too.
+export { ownAddresses };
 
 /** The sentence the window shows instead of an AI answer: written by code. */
 export function codeSentence(result, meaningSentence) {

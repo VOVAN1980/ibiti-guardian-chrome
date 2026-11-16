@@ -1,6 +1,7 @@
 // Firebase AI Logic hybrid inference.
 //
-// The short explanation in Guardian's window:
+// The short explanation in Guardian's window (Gemini's reading of the
+// request, as a form that code checks, and a short note):
 //   InferenceMode.ONLY_ON_DEVICE    the default. Gemini Nano in Chrome, no
 //                                   network. Without Nano there is no
 //                                   explanation; the facts never need one.
@@ -15,17 +16,18 @@
 // there but fails while answering, the explanation is simply missing.
 
 import { initializeApp } from 'firebase/app';
-import { GoogleAIBackend, InferenceMode, Schema, getAI, getGenerativeModel } from 'firebase/ai';
+import { GoogleAIBackend, InferenceMode, getAI, getGenerativeModel } from 'firebase/ai';
 // Both come from the build: the extension and the hosted demo prove themselves
 // to App Check in different ways (see appcheck.ext.js and appcheck.web.js).
 import { cloudReady, startAppCheck } from 'guardian-appcheck';
 import { firebaseConfig } from 'guardian-config';
 import { ON_DEVICE_PARAMS, deviceModelStatus } from './device.js';
+import { DEEP_SCHEMA, READING_SCHEMA } from './reading.js';
 
 /** False when this build has no way to pass App Check, so cloud is off. */
 export { cloudReady };
 
-/** Cloud model for the deeper analysis (the SDK's default hybrid cloud model). */
+/** Cloud model (the SDK's default hybrid cloud model). */
 const CLOUD_MODEL = 'gemini-3.5-flash-lite';
 
 // Two Firebase apps with the same settings. The on-device one never starts
@@ -60,60 +62,46 @@ export async function downloadDeviceModel(onProgress) {
   await model.initializeDeviceModel((fraction) => onProgress(Math.round(fraction * 100)));
 }
 
-/**
- * Reads a streamed answer. `onText` gets the whole text so far (the window
- * checks it before showing anything) and returns false to stop reading: once
- * a sentence fails the checks, the rest is not wanted. `firstMs` is when the
- * first words came.
- */
-async function readStream(model, prompt, onText, options) {
+// Gemini answers a form (src/ai/reading.js), the same JSON Schema on both
+// paths: Chrome's Prompt API takes it as a response constraint for Gemini
+// Nano, the cloud model as its response schema.
+const deviceParams = () => ({
+  ...ON_DEVICE_PARAMS,
+  promptOptions: { responseConstraint: READING_SCHEMA },
+});
+const cloudParams = (schema) => ({
+  model: CLOUD_MODEL,
+  generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, temperature: 0.2 },
+});
+
+/** One answer, timed, with where the SDK ran it. */
+async function answer(model, prompt, signal) {
   const started = performance.now();
-  const result = await model.generateContentStream(prompt, options);
-  let text = '';
-  let firstMs = null;
-  let source = null;
-  let stopped = false;
-  for await (const chunk of result.stream) {
-    // Where the SDK actually ran it, as the SDK reports it on every chunk.
-    source = source || chunk.inferenceSource || null;
-    text += chunk.text();
-    if (firstMs === null && text.trim()) firstMs = Math.round(performance.now() - started);
-    if (onText(text) === false) {
-      stopped = true;
-      break;
-    }
-  }
-  if (stopped) {
-    result.response.catch(() => {}); // the rest is not read
-  } else {
-    const response = await result.response;
-    source = response.inferenceSource || source;
-  }
+  const result = await model.generateContent(prompt, signal ? { signal } : undefined);
   return {
-    text: text.trim(),
-    firstMs,
+    text: result.response.text().trim(),
     ms: Math.round(performance.now() - started),
-    source: source || 'unknown',
-    stopped,
+    // Where the SDK actually ran it, as the SDK reports it.
+    source: result.response.inferenceSource || 'unknown',
   };
 }
 
 /**
- * Streams a short explanation from the on-device model.
- * @returns {{text: string, firstMs: number, ms: number, source: string}}
+ * The short explanation from Gemini Nano on this computer.
+ * @returns {{text: string, ms: number, source: string}}  text: the form, as JSON
  */
-export async function explainOnDevice(prompt, onText) {
+export async function readOnDevice(prompt) {
   const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
-    onDeviceParams: ON_DEVICE_PARAMS,
+    onDeviceParams: deviceParams(),
   });
-  return readStream(model, prompt, onText);
+  return answer(model, prompt);
 }
 
 /**
- * The same short explanation through the SDK's hybrid mode: Gemini Nano when
- * it is ready on this computer, otherwise Gemini in the cloud. Call only after
- * the user has allowed the cloud.
+ * The same through the SDK's hybrid mode: Gemini Nano when it is ready on
+ * this computer, otherwise Gemini in the cloud. Call only after the user has
+ * allowed the cloud.
  *
  * The SDK decides where to run at the moment of the call. So `prompt` must
  * always be the text that may go to the cloud (no own address, no balance),
@@ -128,52 +116,25 @@ export async function explainOnDevice(prompt, onText) {
  *
  * `signal` stops a cloud request that has not gone out yet (the user turned
  * the permission off): the SDK checks it right before sending.
- * @returns {{text: string, firstMs: number, ms: number, source: string}}
+ * @returns {{text: string, ms: number, source: string}}
  */
-export async function explainHybrid(prompt, onText, { deviceReady = false, signal } = {}) {
+export async function readHybrid(prompt, { deviceReady = false, signal } = {}) {
   const model = getGenerativeModel(deviceReady ? onDevice() : inCloud(), {
     mode: InferenceMode.PREFER_ON_DEVICE,
-    onDeviceParams: ON_DEVICE_PARAMS,
-    inCloudParams: { model: CLOUD_MODEL, generationConfig: { temperature: 0.2 } },
+    onDeviceParams: deviceParams(),
+    inCloudParams: cloudParams(READING_SCHEMA),
   });
-  return readStream(model, prompt, onText, signal ? { signal } : undefined);
+  return answer(model, prompt, signal);
 }
 
-const PATTERN_KINDS = ['known_scam_pattern', 'no_known_pattern', 'cannot_determine'];
-
-const DEEP_SCHEMA = Schema.object({
-  properties: {
-    summary: Schema.string(),
-    ifYouConfirm: Schema.string(),
-    patternKind: Schema.enumString({ enum: PATTERN_KINDS }),
-    patternName: Schema.string(),
-    checks: Schema.array({ items: Schema.string() }),
-  },
-  optionalProperties: ['patternName'],
-});
-
 /**
- * Deeper, structured analysis from the cloud model. Call only after consent.
- * @returns {{data: object, ms: number, source: string}}
+ * The deeper analysis from the cloud model. Call only after the user asked.
+ * @returns {{text: string, ms: number, source: string}}  text: the form, as JSON
  */
 export async function analyzeInCloud(prompt, { signal } = {}) {
   const model = getGenerativeModel(inCloud(), {
     mode: InferenceMode.ONLY_IN_CLOUD,
-    inCloudParams: {
-      model: CLOUD_MODEL,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: DEEP_SCHEMA,
-        temperature: 0.2,
-      },
-    },
+    inCloudParams: cloudParams(DEEP_SCHEMA),
   });
-  const started = performance.now();
-  const result = await model.generateContent(prompt, signal ? { signal } : undefined);
-  const data = JSON.parse(result.response.text());
-  return {
-    data,
-    ms: Math.round(performance.now() - started),
-    source: result.response.inferenceSource || 'in_cloud',
-  };
+  return answer(model, prompt, signal);
 }

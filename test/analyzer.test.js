@@ -228,3 +228,100 @@ test('batch takes the highest risk of its parts', () => {
   assert.equal(r.risk, 'danger');
   assert.equal(r.facts.length, 2);
 });
+
+test('coins sent along with a token call are a fact and a high risk, even on a revoke', () => {
+  const r = analyze(tx(USDT, call('0x095ea7b3', pad(SPENDER), uint(0)), '0xde0b6b3a7640000'));
+  assert.equal(r.kind, 'revoke');
+  assert.equal(r.risk, 'danger');
+  assert.equal(factValue(r, 'Also sends'), '1 ETH');
+  assert.match(r.reasons[0], /also sends 1 ETH to the contract/);
+  assert.equal(r.subject.coins, '1 ETH');
+  // The same for an approval.
+  const a = analyze(tx(USDC, call('0x095ea7b3', pad(PERMIT2), uint(1_000_000n)), '0x1'));
+  assert.equal(a.risk, 'danger');
+  assert.ok(factValue(a, 'Also sends'));
+});
+
+test('increaseAllowance says "more": it adds to what the spender may already move', () => {
+  const r = analyze(tx(USDC, call('0x39509351', pad(SPENDER), uint(5_000_000n))));
+  assert.equal(r.headline, 'Extra spending permission for 5 USDC');
+  assert.equal(factValue(r, 'Amount'), '5 USDC more');
+  assert.match(r.reasons[0], /up to 5 USDC more/);
+});
+
+test('a Permit2 allowance says when it ends', () => {
+  const soon = Math.floor(Date.now() / 1000) + 7 * 86400;
+  const r = analyze(tx(PERMIT2, call('0x87517c45', pad(USDC), pad(SPENDER), uint(10_000_000n), uint(soon))));
+  assert.match(factValue(r, 'Permission ends'), /^\d{4}-\d\d-\d\d \d\d:\d\d UTC$/);
+  assert.ok(r.reasons.some((x) => /stays active until \d{4}-.* UTC, unless you revoke it sooner/.test(x)));
+  assert.ok(!r.reasons.includes('The permission stays active until you revoke it.'));
+  const now = analyze(tx(PERMIT2, call('0x87517c45', pad(USDC), pad(SPENDER), uint(10_000_000n), uint(0))));
+  assert.equal(factValue(now, 'Permission ends'), 'In the same transaction only');
+  // An ordinary approval has no end time.
+  assert.equal(factValue(analyze(tx(USDT, call('0x095ea7b3', pad(SPENDER), uint(MAX)))), 'Permission ends'), undefined);
+});
+
+test('a Permit2 transfer signature is one-time: no permission stays behind', () => {
+  const typed = {
+    primaryType: 'PermitTransferFrom',
+    domain: { name: 'Permit2', chainId: 1, verifyingContract: PERMIT2 },
+    message: { permitted: { token: USDC, amount: '800000000' }, spender: SPENDER, nonce: 1, deadline: 4102444800 },
+  };
+  const r = analyze({ method: 'eth_signTypedData_v4', params: [ME, JSON.stringify(typed)], chainId: 1 });
+  assert.equal(r.kind, 'permit2');
+  assert.equal(r.subject.action, 'permitTransfer');
+  assert.equal(r.headline, 'Signature that lets someone take up to 800 USDC');
+  assert.match(r.reasons[0], /once, until this signature expires/);
+  assert.ok(!r.reasons.some((x) => /until you revoke/.test(x)));
+  assert.equal(factValue(r, 'Valid until'), 'More than a year from now');
+});
+
+test('a Permit2 batch keeps every token’s reasons, not only the first one’s', () => {
+  const unknown = '0x00000000000000000000000000000000deadbeef';
+  const typed = {
+    primaryType: 'PermitBatch',
+    domain: { name: 'Permit2', chainId: 1, verifyingContract: PERMIT2 },
+    message: {
+      details: [
+        { token: USDC, amount: '1000000', expiration: 4102444800, nonce: 0 },
+        { token: unknown, amount: MAX.toString(), expiration: 4102444800, nonce: 0 },
+      ],
+      spender: SPENDER,
+      sigDeadline: 4102444800,
+    },
+  };
+  const r = analyze({ method: 'eth_signTypedData_v4', params: [ME, JSON.stringify(typed)], chainId: 1 });
+  assert.equal(r.risk, 'danger');
+  assert.ok(r.reasons.some((x) => /up to 1 USDC/.test(x)), r.reasons.join(' | '));
+  assert.ok(r.reasons.some((x) => /any amount of this token/.test(x)), r.reasons.join(' | '));
+  assert.equal(new Set(r.reasons).size, r.reasons.length, 'no reason twice');
+  assert.equal(factValue(r, 'Permissions end'), 'More than a year from now');
+  assert.ok(factValue(r, 'Spender'));
+});
+
+test('transferFrom says whose tokens move', () => {
+  const other = '0x3333333333333333333333333333333333333333';
+  const theirs = analyze(tx(USDT, call('0x23b872dd', pad(other), pad(SPENDER), uint(1_000_000n))));
+  assert.equal(theirs.headline, 'Move 1 USDT from another address');
+  assert.equal(theirs.subject.fromSelf, false);
+  assert.equal(theirs.facts.find((f) => f.label === 'From').note, 'not this wallet');
+  const mine = analyze(tx(USDT, call('0x23b872dd', pad(ME), pad(SPENDER), uint(1_000_000n))));
+  assert.equal(mine.headline, 'Send 1 USDT');
+  assert.equal(mine.subject.fromSelf, true);
+});
+
+test('a payment to the wallet’s own address says so', () => {
+  const r = analyze(tx(ME, '0x', '0x1'));
+  assert.equal(r.subject.toSelf, true);
+  assert.equal(r.facts.find((f) => f.label === 'To').note, 'an address of this wallet');
+  const other = analyze({ ...tx(SPENDER, '0x', '0x1'), enrich: { accounts: [SPENDER] } });
+  assert.equal(other.subject.toSelf, true, 'another connected account of the wallet');
+});
+
+test('a batch line says with whom', () => {
+  const r = analyze({
+    method: 'wallet_sendCalls',
+    params: [{ chainId: '0x1', calls: [{ to: USDT, data: call('0xa9059cbb', pad(SPENDER), uint(1_000_000n)) }] }],
+  });
+  assert.equal(factValue(r, 'Action 1'), 'Send 1 USDT, to 0x9f3a…1e00');
+});

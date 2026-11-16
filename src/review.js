@@ -1,20 +1,16 @@
 // Guardian's own review window (an extension page the site cannot touch; in
 // the hosted demo, the same page shown in a frame).
-// Facts and the risk level come from the deterministic analyzer. The AI only
-// explains them: on this computer by default; in the cloud only when the user
-// has allowed it (the hybrid fallback) or asks for the deeper analysis.
+// Facts, the risk level and the sentence on what confirming does come from
+// the deterministic analyzer. Gemini reads the same facts and fills in a form
+// that code checks against them; only then is its short note shown. On this
+// computer by default; in the cloud only when the user has allowed it (the
+// hybrid fallback) or asks for the deeper analysis.
 
 import { analyze } from './analyzer/index.js';
-import {
-  analyzeInCloud,
-  cloudReady,
-  deviceModelStatus,
-  downloadDeviceModel,
-  explainHybrid,
-  explainOnDevice,
-} from './ai/engine.js';
-import { answerChecker, codeSentence, isUndecoded, ownAddresses, scrubAddresses, scrubResult } from './ai/guard.js';
-import { deepPrompt, explainPrompt, meaning } from './ai/prompt.js';
+import { analyzeInCloud, cloudReady, deviceModelStatus, downloadDeviceModel, readHybrid, readOnDevice } from './ai/engine.js';
+import { codeSentence, isUndecoded, ownAddresses, scrubAddresses, scrubResult } from './ai/guard.js';
+import { deepPrompt, meaning, readingPrompt, shownReasons } from './ai/prompt.js';
+import { PATTERNS, checkAnalysis, checkExplanation } from './ai/reading.js';
 import {
   allowCloudFallback,
   closeReview,
@@ -128,8 +124,9 @@ function render(record, result) {
   $('allow').textContent = safeIsReject ? 'Continue anyway' : 'Continue to wallet';
 }
 
-// ── Short explanation: on this computer by default; with the user's
-// permission, the SDK's hybrid mode falls back to the cloud when this
+// ── Short explanation: what confirming does, written by code; Gemini's
+// reading of it, checked, and its note. On this computer by default; with the
+// user's permission, the SDK's hybrid mode falls back to the cloud when this
 // computer has no on-device model ──
 
 function setChip(element, source, ms, label) {
@@ -159,12 +156,13 @@ function offerDownload(result, host) {
 }
 
 /**
- * The explanation prompt as it may go to the cloud: no balance, no own
- * address (taken out of every value before any value is shortened, and again
- * from the finished text).
+ * The explanation prompt. Never with the user's own address (taken out of
+ * every value before any value is shortened, and again from the finished
+ * text). The one that may go to the cloud also leaves out the balance.
  */
-const cloudExplainPrompt = (result, host) =>
-  scrubAddresses(explainPrompt(scrubResult(result, own), host, { cloud: true }), own);
+const cloudPrompt = (result, host) =>
+  scrubAddresses(readingPrompt(scrubResult(result, own), host, { cloud: true }), own);
+const devicePrompt = (result, host) => scrubAddresses(readingPrompt(scrubResult(result, own), host), own);
 
 /** The network of the request under review (for the coin it pays gas in). */
 let chainId = null;
@@ -188,7 +186,7 @@ function offerFallback(result, host) {
       'Gemini in the cloud then explains instead, through Firebase, for the rest of this visit whenever this browser ' +
       'has no on-device model. Sends the decoded details below, never your wallet address.';
   }
-  showSent(cloudExplainPrompt(result, host), false);
+  showSent(cloudPrompt(result, host), false);
   $('local-fallback').hidden = false;
   const allow = $('local-fallback-allow');
   allow.onclick = async () => {
@@ -253,10 +251,31 @@ function cloudProblem(error) {
   return 'The cloud could not be reached.';
 }
 
-const CHECKED = 'its addresses, amounts and token names were checked against the request';
+// What the window says about Gemini's part, once code has checked it.
+const COMPARED = 'what it is, who gains, which way assets move, the limit';
+
+/** Marks the analyzer's reasons that Gemini picked as the most important. */
+function markTop(top) {
+  const items = [...document.querySelectorAll('#reasons li')];
+  for (const li of items) {
+    delete li.dataset.top;
+    li.querySelector('.pick')?.remove();
+  }
+  for (const n of top) {
+    const li = items[n - 1];
+    if (!li) continue;
+    li.dataset.top = String(n);
+    const pick = document.createElement('span');
+    pick.className = 'pick';
+    pick.textContent = 'Gemini: most important';
+    li.append(pick);
+  }
+  document.body.dataset.top = top.join(',');
+}
 
 async function runLocal(result, host) {
   const text = $('local-text');
+  const note = $('local-note');
   const meta = $('local-meta');
   const status = await deviceModelStatus();
   const deviceReady = status === 'available';
@@ -269,13 +288,21 @@ async function runLocal(result, host) {
   $('local-chip').hidden = true;
   $('local-sent-box').hidden = true;
   meta.hidden = true;
-  delete document.body.dataset.source;
+  note.hidden = true;
+  note.textContent = '';
+  note.classList.remove('pending', 'muted');
+  markTop([]);
+  for (const key of ['source', 'checked', 'withheld', 'withheldDetail', 'reading', 'stopped', 'localError']) {
+    delete document.body.dataset[key];
+  }
+
+  // What confirming does, written by code from the decoded request: shown at
+  // once, whatever any AI says or fails to say.
+  text.textContent = codeSentence(result, meaning(result, host));
 
   // Nothing decoded, nothing to explain: a model could only guess what the
   // request does. Guardian says so itself, and no AI is asked.
   if (isUndecoded(result)) {
-    text.classList.remove('pending');
-    text.textContent = codeSentence(result, meaning(result, host));
     meta.textContent =
       'Guardian could not decode this request, so no AI explains it: an explanation could only be a guess. Written by Guardian.';
     meta.hidden = false;
@@ -284,44 +311,31 @@ async function runLocal(result, host) {
   }
 
   if (!deviceReady && !hybrid) {
-    text.classList.remove('pending');
-    if (canDownload) {
-      text.textContent = 'The on-device model is not downloaded yet.';
-      offerDownload(result, host);
-    } else {
-      text.classList.add('muted');
-      text.textContent = 'On-device AI is not available in this browser. The facts below do not depend on it.';
-    }
+    meta.textContent = canDownload
+      ? 'Written by Guardian. Gemini Nano can add a note once its model is downloaded.'
+      : 'Written by Guardian. On-device AI is not available in this browser; the facts below do not depend on it.';
+    meta.hidden = false;
+    if (canDownload) offerDownload(result, host);
     offerFallback(result, host);
     return;
   }
 
   $('local-fallback').hidden = true;
-  text.classList.remove('muted');
-  text.classList.add('pending');
-  text.textContent = deviceReady
-    ? 'Gemini Nano is writing on this computer. Each sentence appears once its addresses, amounts and token names have been checked against the request.'
-    : 'Gemini is writing in the cloud. Each sentence appears once its addresses, amounts and token names have been checked against the request.';
+  note.hidden = false;
+  note.classList.add('pending');
+  note.textContent = deviceReady
+    ? 'Gemini Nano is reading this request on your computer…'
+    : 'Gemini is reading this request in the cloud…';
 
   const toCloud = hybrid && !deviceReady;
   // With the permission on, the SDK decides where the answer is written, and
   // it decides again at the moment of the call: Gemini Nano that was ready a
   // moment ago may be gone. So whatever is handed to the hybrid mode is
   // already the text that may go to the cloud: no own address, no balance.
-  const prompt = hybrid ? cloudExplainPrompt(result, host) : explainPrompt(result, host);
-  const sentence = meaning(result, host);
-  const checker = answerChecker(result, sentence, { own, chainId, host });
+  const prompt = hybrid ? cloudPrompt(result, host) : devicePrompt(result, host);
+  // The reason numbers that prompt showed: the only ones Gemini may pick.
+  const shown = shownReasons(result, { cloud: hybrid }).map(([n]) => n);
   const started = performance.now();
-  let shownMs = null;
-  // Once this run has ended (answered, failed or timed out), nothing more
-  // from it may reach the screen.
-  let over = false;
-  const show = ({ shown }) => {
-    if (over || !shown) return;
-    if (shownMs === null) shownMs = Math.round(performance.now() - started);
-    text.classList.remove('pending');
-    text.textContent = shown;
-  };
 
   // Turning the permission off stops a cloud request that has not gone out,
   // on either path of the hybrid mode; so does the time-out.
@@ -329,86 +343,62 @@ async function runLocal(result, host) {
   const stopListening = hybrid ? onCloudFallbackOff(() => stop.abort(new Error('cloud turned off'))) : () => {};
   let run = null;
   try {
-    // Reading stops at the first sentence that fails: the rest is not wanted.
-    const onText = (partial) => {
-      if (over) return false;
-      const state = checker.push(partial);
-      show(state);
-      return state.problem === null;
-    };
-    const ask = () => explainHybrid(prompt, onText, { deviceReady, signal: stop.signal });
-    run = hybrid ? ask() : explainOnDevice(prompt, onText);
+    run = hybrid ? readHybrid(prompt, { deviceReady, signal: stop.signal }) : readOnDevice(prompt);
     const out = toCloud ? await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e)) : await run;
-    over = true;
-    const verdict = checker.finish(out.text);
-    text.classList.remove('pending');
+    const verdict = checkExplanation(out.text, result, { sentence: meaning(result, host), own, chainId, host, shown });
+    note.classList.remove('pending');
     setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
     const requests = cloudRequestsBetween(started, performance.now());
     const where =
       out.source === 'on_device'
-        ? `Gemini Nano, running in Chrome. Written on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`
+        ? `Gemini Nano, running in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`
         : 'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
-    if (verdict.problem && verdict.shown) {
-      // The answer stopped at a sentence that failed; what is on screen passed.
-      text.textContent = verdict.shown;
-      meta.textContent = `${where} Gemini's answer was cut short: its next sentence had ${verdict.problem}.`;
-      document.body.dataset.checked = 'cut';
-    } else if (verdict.problem) {
-      // Nothing passed: what the user reads is written by code from the facts.
-      text.textContent = codeSentence(result, sentence);
-      meta.textContent =
-        verdict.problem === 'nothing'
-          ? 'Gemini gave no usable answer, so this sentence is written by Guardian from the facts.'
-          : `Gemini's answer was not shown: it had ${verdict.problem}. This sentence is written by Guardian from the facts.`;
-      document.body.dataset.checked = 'withheld';
+    if (verdict.checked === 'passed') {
+      note.textContent = verdict.note;
+      meta.textContent = `${where} Its reading of the request matched Guardian's decoder (${COMPARED}), so its note is shown. The sentence above is written by Guardian.`;
     } else {
-      text.textContent = verdict.shown;
-      meta.textContent = `${where} Before it was shown, ${CHECKED}.`;
-      document.body.dataset.checked = 'passed';
+      note.hidden = true;
+      note.textContent = '';
+      meta.textContent =
+        verdict.checked === 'note-withheld'
+          ? `${where} Its reading of the request matched Guardian's decoder (${COMPARED}), but its note was not shown: it had ${verdict.problem}. The sentence above is written by Guardian.`
+          : `${where} Nothing from it is shown: it gave ${verdict.problem}. The sentence above is written by Guardian.`;
     }
+    markTop(verdict.top);
+    meta.hidden = false;
+    if (out.source !== 'on_device') showSent(prompt, true);
+    $('local-chip').title = `Answered after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
+    Object.assign(document.body.dataset, {
+      local: 'done',
+      source: out.source,
+      ms: String(out.ms),
+      requests: String(requests),
+      checked: verdict.checked,
+      reading: out.text.slice(0, 2000), // tests and logs only
+    });
     if (verdict.problem) {
       document.body.dataset.withheld = verdict.problem;
       document.body.dataset.withheldDetail = verdict.detail || ''; // tests and logs only
     }
-    meta.hidden = false;
-    if (out.source !== 'on_device') showSent(prompt, true);
-    $('local-chip').title =
-      `First words after ${seconds(out.firstMs ?? out.ms)}; checked text shown after ${seconds(shownMs ?? out.ms)}; ` +
-      `finished after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
-    Object.assign(document.body.dataset, {
-      local: 'done',
-      source: out.source,
-      firstMs: String(out.firstMs ?? ''),
-      shownMs: String(shownMs ?? ''),
-      ms: String(out.ms),
-      requests: String(requests),
-    });
-    saveLastExplanation({
-      source: out.source,
-      firstMs: out.firstMs,
-      shownMs,
-      ms: out.ms,
-      requests,
-      checked: document.body.dataset.checked,
-    });
+    saveLastExplanation({ source: out.source, ms: out.ms, requests, checked: verdict.checked });
   } catch (error) {
-    over = true;
     if (run) run.catch(() => {}); // a late failure after the time-out
-    text.classList.remove('pending');
-    text.classList.add('muted');
+    note.classList.remove('pending');
+    note.classList.add('muted');
+    note.hidden = false;
     const message = String((error && error.message) || error);
     const turnedOff = stop.signal.aborted && /turned off/i.test(String(stop.signal.reason && stop.signal.reason.message));
     if (turnedOff) {
-      text.textContent = 'Cloud AI was turned off, so the explanation was stopped. The facts below do not depend on it.';
+      note.textContent = 'Cloud AI was turned off, so Gemini was stopped. The facts below do not depend on it.';
       document.body.dataset.stopped = 'turned-off';
     } else if (toCloud) {
-      text.textContent = `${cloudProblem(error)} The facts below do not depend on it.`;
+      note.textContent = `${cloudProblem(error)} The facts below do not depend on it.`;
       meta.textContent = isPreview
         ? 'Cloud AI stays allowed for this visit.'
         : 'Cloud AI can be turned off in Guardian’s toolbar panel.';
       meta.hidden = false;
     } else {
-      text.textContent = 'The AI could not answer this time. The facts below do not depend on it.';
+      note.textContent = 'The AI could not answer this time. The facts below do not depend on it.';
     }
     document.body.dataset.local = 'error';
     document.body.dataset.localError = message.slice(0, 300);
@@ -455,61 +445,41 @@ function wireCloud(result, host) {
     const stop = new AbortController();
     try {
       const out = await withTimeout(analyzeInCloud(prompt, { signal: stop.signal }), CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
-      const data = out.data || {};
-      const summary = String(data.summary || '');
-      const confirm = String(data.ifYouConfirm || '');
-      // A list number the model puts in front ("1. Verify …") is not part of the advice.
-      const checks = (Array.isArray(data.checks) ? data.checks : [])
-        .slice(0, 4)
-        .map((item) => String(item).replace(/^\s*\d{1,2}[.)]\s+/, ''));
-      const name = String(data.patternName || '');
-      // Every piece is checked against the facts before anything is shown.
-      const truthExtra = meaning(result, host);
-      const failed = [summary, confirm, name, ...checks]
-        .map((piece) => answerChecker(result, truthExtra, { own, chainId, host }).finish(piece))
-        .find((v) => v.problem && v.problem !== 'nothing');
-      const problem = failed ? failed.problem : null;
-      // For tests and logs only; the window never repeats it.
-      if (failed) document.body.dataset.cloudWithheldDetail = failed.detail;
-      const passed = !problem && summary.trim() !== '';
-      if (passed) {
-        $('cloud-summary').textContent = summary;
-        $('cloud-confirm').textContent = confirm;
-        $('cloud-checks').replaceChildren(
-          ...checks.map((item) => {
+      const verdict = checkAnalysis(out.text, result, { sentence: meaning(result, host), own, chainId, host });
+      document.body.dataset.cloudReading = out.text.slice(0, 3000); // tests and logs only
+      $('cloud-checks').replaceChildren();
+      if (verdict.passed) {
+        $('cloud-summary').textContent = verdict.summary;
+        $('cloud-summary').hidden = false;
+        $('cloud-confirm').textContent = '';
+        $('cloud-confirm').hidden = true;
+        $('cloud-pattern').textContent = PATTERNS[verdict.pattern].label;
+        $('cloud-checks').append(
+          ...verdict.checks.map((item) => {
             const li = document.createElement('li');
             li.textContent = item;
             return li;
           }),
         );
         document.body.dataset.cloudChecked = 'passed';
+        document.body.dataset.patternKind = verdict.pattern;
       } else {
-        $('cloud-summary').textContent = codeSentence(result, truthExtra);
-        $('cloud-confirm').textContent = problem
-          ? `Gemini's analysis was not shown: it had ${problem}. This sentence is written by Guardian from the facts.`
-          : 'Gemini gave no usable analysis, so this sentence is written by Guardian from the facts.';
-        $('cloud-checks').replaceChildren();
+        $('cloud-summary').textContent = '';
+        $('cloud-summary').hidden = true;
+        $('cloud-confirm').textContent = `Gemini's analysis was not shown: it had ${verdict.problem}. The sentence at the top is written by Guardian.`;
+        $('cloud-confirm').hidden = false;
+        $('cloud-pattern').textContent = '';
         document.body.dataset.cloudChecked = 'withheld';
-        document.body.dataset.cloudWithheld = problem || 'nothing';
+        document.body.dataset.cloudWithheld = verdict.problem;
+        document.body.dataset.cloudWithheldDetail = verdict.detail; // tests and logs only
+        document.body.dataset.patternKind = 'withheld';
       }
-      // The scam-pattern label. The risk is Guardian's, decided by code: the
-      // label is shown only from an answer that passed, and a "known scam"
-      // label never on a request Guardian found no red flags in.
-      let pattern = '';
-      const kind = String(data.patternKind || 'cannot_determine');
-      if (passed) {
-        if (kind === 'known_scam_pattern' && result.risk !== 'info') pattern = name || 'Matches a known scam pattern';
-        else if (kind === 'no_known_pattern') pattern = 'No known scam pattern matched. That alone does not make it safe';
-        else if (kind === 'cannot_determine') pattern = 'Could not determine what this does';
-      }
-      $('cloud-pattern').textContent = pattern;
-      document.body.dataset.patternKind = passed ? kind : 'withheld';
       $('cloud-result').hidden = false;
       setChip($('cloud-chip'), out.source, out.ms);
       ask.hidden = true;
       $('cloud-sent-box').querySelector('summary').textContent = 'Exactly what was sent';
-      $('cloud-consent').textContent = passed
-        ? `Gemini through Firebase AI Logic, at your request. Before it was shown, ${CHECKED}.`
+      $('cloud-consent').textContent = verdict.passed
+        ? 'Gemini through Firebase AI Logic, at your request. Its reading of the request and the scam pattern it named matched Guardian’s decoder, and its own words name nothing.'
         : 'Gemini through Firebase AI Logic, at your request. Its answer did not pass Guardian’s checks.';
       document.body.dataset.cloud = 'done';
     } catch (error) {

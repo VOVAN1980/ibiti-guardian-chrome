@@ -43,13 +43,15 @@ export function maxRisk(a, b) {
  * @param {number|null} [req.chainId]
  * @param {string} [req.origin] origin of the page that asked
  * @param {object} [req.enrich] on-chain reads made through the user's wallet:
- *   { token: {symbol, decimals}, spenderIsContract: boolean|null }
+ *   { token: {symbol, decimals}, spenderIsContract: boolean|null, accounts: string[] }
  */
 export function analyze(req) {
   const ctx = {
     chainId: typeof req.chainId === 'number' ? req.chainId : null,
     origin: req.origin || '',
     enrich: req.enrich || {},
+    // The user's own addresses: who "you" are in this request.
+    self: new Set(ownAddresses(req)),
   };
   const params = Array.isArray(req.params) ? req.params : [];
 
@@ -117,6 +119,31 @@ function analyzeTransaction(tx, ctx) {
   }
 
   const selector = selectorOf(data);
+  const decoded = decodeCall(selector, to, data, ctx);
+  if (decoded) return value > 0n ? withCoins(decoded, value, chain, to) : decoded;
+
+  const facts = [
+    fact('Action', 'Contract call Guardian cannot decode'),
+    fact('Contract', to, { mono: true }),
+    fact('Function', selector || 'unknown', { mono: true }),
+    fact('Network', chain.name),
+  ];
+  if (value > 0n) facts.push(fact('Sends', `${formatUnits(value, 18)} ${chain.native}`));
+  return {
+    kind: 'contractCall',
+    risk: 'caution',
+    headline: 'Contract call that cannot be decoded',
+    facts,
+    reasons: [
+      'Guardian cannot tell what this call does, so it cannot confirm it is safe.',
+      ...(value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : []),
+    ],
+    subject: { action: 'contractCall', contract: to, selector, value: value.toString() },
+  };
+}
+
+/** A token call Guardian can read, or null. */
+function decodeCall(selector, to, data, ctx) {
   switch (selector) {
     case SELECTOR.approve:
     case SELECTOR.increaseAllowance:
@@ -150,38 +177,38 @@ function analyzeTransaction(tx, ctx) {
         ctx,
       });
     case SELECTOR.permit2Approve:
-      if (to === PERMIT2) {
-        return tokenApproval({
-          token: wordToAddress(word(data, 0)),
-          spender: wordToAddress(word(data, 1)),
-          amount: wordToBigInt(word(data, 2)),
-          via: 'Permit2 approve',
-          ctx: { ...ctx, enrich: {} },
-          unlimitedAt: MAX_UINT160,
-        });
-      }
-      break;
+      if (to !== PERMIT2) return null;
+      // approve(token, spender, uint160 amount, uint48 expiration)
+      return tokenApproval({
+        token: wordToAddress(word(data, 0)),
+        spender: wordToAddress(word(data, 1)),
+        amount: wordToBigInt(word(data, 2)),
+        via: 'Permit2 approve',
+        ctx: { ...ctx, enrich: {} },
+        unlimitedAt: MAX_UINT160,
+        expires: wordToBigInt(word(data, 3)),
+      });
     default:
-      break;
+      return null;
   }
+}
 
-  const facts = [
-    fact('Action', 'Contract call Guardian cannot decode'),
-    fact('Contract', to, { mono: true }),
-    fact('Function', selector || 'unknown', { mono: true }),
-    fact('Network', chain.name),
-  ];
-  if (value > 0n) facts.push(fact('Sends', `${formatUnits(value, 18)} ${chain.native}`));
+/**
+ * Coins sent along with a token call. Approvals, token transfers and
+ * collection approvals never need them: the coins simply go to the contract,
+ * on top of whatever the call does.
+ */
+function withCoins(result, value, chain, contract) {
+  const coins = `${formatUnits(value, 18)} ${chain.native}`;
   return {
-    kind: 'contractCall',
-    risk: 'caution',
-    headline: 'Contract call that cannot be decoded',
-    facts,
+    ...result,
+    risk: 'danger',
+    facts: [...result.facts, fact('Also sends', coins, { tone: 'danger' })],
     reasons: [
-      'Guardian cannot tell what this call does, so it cannot confirm it is safe.',
-      ...(value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : []),
+      `It also sends ${coins} to the contract it calls. This kind of request never needs coins attached.`,
+      ...result.reasons,
     ],
-    subject: { action: 'contractCall', contract: to, selector, value: value.toString() },
+    subject: { ...result.subject, coins, contract },
   };
 }
 
@@ -215,14 +242,16 @@ function transferRisk(share, what) {
 
 function nativeTransfer(to, value, chain, ctx) {
   const amount = `${formatUnits(value, 18)} ${chain.native}`;
+  const toSelf = ctx.self.has(to);
+  const toFact = fact('To', to, { mono: true, ...(toSelf ? { note: 'an address of this wallet' } : {}) });
   if (value === 0n) {
     return {
       kind: 'nativeTransfer',
       risk: 'info',
       headline: 'Empty transaction',
-      facts: [fact('Action', 'Send coins'), fact('Amount', amount), fact('To', to, { mono: true }), fact('Network', chain.name)],
+      facts: [fact('Action', 'Send coins'), fact('Amount', amount), toFact, fact('Network', chain.name)],
       reasons: [],
-      subject: { action: 'nativeTransfer', to, amount },
+      subject: { action: 'nativeTransfer', to, amount, empty: true, toSelf },
     };
   }
   const judged = transferRisk(shareOfBalance(value, ctx.enrich.balance), chain.native);
@@ -236,7 +265,7 @@ function nativeTransfer(to, value, chain, ctx) {
         ...(judged.note ? { note: judged.note } : {}),
         ...(judged.risk === 'danger' ? { tone: 'danger' } : {}),
       }),
-      fact('To', to, { mono: true }),
+      toFact,
       fact('Network', chain.name),
     ],
     reasons: [
@@ -245,7 +274,7 @@ function nativeTransfer(to, value, chain, ctx) {
     ],
     // Reasons that come from the user's balance; kept out of cloud prompts.
     balanceReasons: judged.reasons,
-    subject: { action: 'nativeTransfer', to, amount, shareOfBalance: judged.note },
+    subject: { action: 'nativeTransfer', to, amount, shareOfBalance: judged.note, toSelf },
   };
 }
 
@@ -301,14 +330,60 @@ function spenderFacts(spender, ctx, reasons) {
   return { risk, known: null, value: spender };
 }
 
-function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt }) {
+/** A time in seconds as shown to the user: a date, or "more than a year". */
+function when(seconds) {
+  const far = seconds > BigInt(Math.floor(Date.now() / 1000)) + 365n * 24n * 3600n;
+  if (far) return { text: 'More than a year from now', far: true };
+  return { text: `${new Date(Number(seconds) * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC`, far: false };
+}
+
+/**
+ * How long a spending permission lasts. An ordinary approval or an EIP-2612
+ * permit lasts until it is revoked (or used up); a Permit2 allowance also has
+ * its own end time, and 0 there means "only in the transaction that sets it".
+ */
+function lasting(expires) {
+  if (expires === null || expires === undefined) {
+    return { fact: null, phrase: 'until you revoke it', reason: 'The permission stays active until you revoke it.' };
+  }
+  if (expires === 0n) {
+    return {
+      fact: 'In the same transaction only',
+      phrase: 'only in the same transaction that sets it',
+      reason: 'The permission can be used only in the same transaction that sets it.',
+    };
+  }
+  const end = when(expires);
+  return end.far
+    ? {
+        fact: end.text,
+        tone: 'caution',
+        phrase: 'for more than a year, unless you revoke it sooner',
+        reason: 'The permission stays active for more than a year, unless you revoke it sooner.',
+      }
+    : {
+        fact: end.text,
+        phrase: `until ${end.text}, unless you revoke it sooner`,
+        reason: `The permission stays active until ${end.text}, unless you revoke it sooner.`,
+      };
+}
+
+/**
+ * A spending permission: approve, increaseAllowance, an EIP-2612 permit, a
+ * Permit2 allowance (`expires`: its end time) or a Permit2 transfer signature
+ * (`once`: the spender can take the amount one time, until the signature
+ * expires; nothing stays behind).
+ */
+function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt, expires = null, once = false }) {
   const chain = chainInfo(ctx.chainId);
   const tok = describeToken(token, ctx);
   const amt = describeAmount(amount, tok, unlimitedAt);
   const symbol = tok.symbol || 'this token';
   const reasons = [];
+  // increaseAllowance adds to whatever the spender may already move.
+  const more = via === 'increaseAllowance' && !amt.unlimited ? ' more' : '';
 
-  if (amount === 0n) {
+  if (amount === 0n && !once) {
     return {
       kind: 'revoke',
       risk: 'info',
@@ -328,15 +403,19 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt }) {
   const sp = spenderFacts(spender, ctx, reasons);
   risk = maxRisk(risk, sp.risk);
 
-  if (amt.unlimited) {
-    reasons.unshift(
-      `The spender could move any amount of ${symbol} from your wallet, now or later, without asking again.`,
-    );
-    if (!sp.known) risk = 'danger';
+  const what = amt.unlimited ? `any amount of ${symbol}` : `up to ${amt.text}${more}`;
+  if (once) {
+    reasons.unshift(`The spender could take ${what} from your wallet, once, until this signature expires.`);
+  } else if (amt.unlimited) {
+    reasons.unshift(`The spender could move ${what} from your wallet, now or later, without asking again.`);
   } else {
-    reasons.unshift(`The spender could move up to ${amt.text} from your wallet without asking again.`);
+    reasons.unshift(`The spender could move ${what} from your wallet without asking again.`);
+  }
+  if (amt.unlimited) {
+    if (!sp.known) risk = 'danger';
+  } else if (sp.known && sp.risk === 'info') {
     // Bounded amount to a widely used protocol: the ordinary first step of a swap.
-    if (sp.known && sp.risk === 'info') risk = 'info';
+    risk = 'info';
   }
   if (!sp.known) reasons.push('Guardian does not recognise the spender address.');
   if (tok.impersonates) {
@@ -345,23 +424,41 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt }) {
       `This token calls itself ${tok.symbol}, but its contract is not the real ${tok.symbol} on ${chain.name}.`,
     );
   }
-  reasons.push('The permission stays active until you revoke it.');
+  const lasts = once ? null : lasting(expires);
+  if (lasts) reasons.push(lasts.reason);
 
+  let headline;
+  if (once) {
+    headline = amt.unlimited ? `Signature that lets someone take any amount of ${symbol}` : `Signature that lets someone take up to ${amt.text}`;
+  } else if (amt.unlimited) {
+    headline = `Unlimited spending permission for ${symbol}`;
+  } else {
+    headline = more ? `Extra spending permission for ${amt.text}` : `Spending permission for ${amt.text}`;
+  }
   return {
     kind: 'approve',
     risk,
-    headline: amt.unlimited
-      ? `Unlimited spending permission for ${symbol}`
-      : `Spending permission for ${amt.text}`,
+    headline,
     facts: [
-      fact('Action', `Token approval (${via})`),
+      fact('Action', once ? 'One-time transfer signature (Permit2)' : `Token approval (${via})`),
       fact('Token', tok.label, tok.verified ? { tone: 'ok', note: 'verified contract' } : {}),
-      fact('Amount', amt.text, amt.unlimited ? { tone: 'danger' } : {}),
+      fact('Amount', `${amt.text}${more}`, amt.unlimited ? { tone: 'danger' } : {}),
       fact('Spender', sp.value, { mono: !sp.known, ...(sp.note ? { tone: 'danger', note: sp.note } : {}) }),
       fact('Network', chain.name),
+      ...(lasts && lasts.fact ? [fact('Permission ends', lasts.fact, lasts.tone ? { tone: lasts.tone } : {})] : []),
     ],
     reasons,
-    subject: { action: 'approve', token: tok, spender, spenderName: sp.known, amount: amt.text },
+    subject: {
+      action: once ? 'permitTransfer' : 'approve',
+      token: tok,
+      spender,
+      spenderName: sp.known,
+      amount: amt.text,
+      unlimited: amt.unlimited,
+      more: more !== '',
+      lasts: lasts ? lasts.phrase : null,
+      ends: lasts ? lasts.fact : null,
+    },
   };
 }
 
@@ -404,10 +501,16 @@ function approvalForAll({ collection, operator, approved, ctx }) {
   };
 }
 
+/**
+ * transfer, or transferFrom. transferFrom names whose tokens move: this
+ * wallet's, or another address's that has allowed this wallet to move them.
+ */
 function tokenTransfer({ token, from, recipient, amount, ctx }) {
   const chain = chainInfo(ctx.chainId);
   const tok = describeToken(token, ctx);
   const amt = describeAmount(amount, tok);
+  const fromSelf = !from || ctx.self.has(from);
+  const toSelf = ctx.self.has(recipient);
   const judged = transferRisk(
     from ? null : shareOfBalance(amount, ctx.enrich.tokenBalance),
     tok.symbol || 'tokens',
@@ -420,19 +523,34 @@ function tokenTransfer({ token, from, recipient, amount, ctx }) {
       ...(judged.risk === 'danger' ? { tone: 'danger' } : {}),
     }),
   ];
-  if (from) facts.push(fact('From', from, { mono: true }));
-  facts.push(fact('To', recipient, { mono: true }), fact('Network', chain.name));
+  if (from) facts.push(fact('From', from, { mono: true, note: fromSelf ? 'this wallet' : 'not this wallet' }));
+  facts.push(
+    fact('To', recipient, { mono: true, ...(toSelf ? { note: 'an address of this wallet' } : {}) }),
+    fact('Network', chain.name),
+  );
   return {
     kind: 'transfer',
     risk: judged.risk,
-    headline: `Send ${amt.text}`,
+    headline: fromSelf ? `Send ${amt.text}` : `Move ${amt.text} from another address`,
     facts,
     reasons: [
       ...judged.reasons,
+      ...(fromSelf
+        ? []
+        : ['The tokens come from the From address, not from this wallet. This works only if that address has allowed this wallet to move them.']),
       'This moves tokens to the address above. A confirmed transfer cannot be undone.',
     ],
     balanceReasons: judged.reasons,
-    subject: { action: 'transfer', token: tok, to: recipient, amount: amt.text, shareOfBalance: judged.note },
+    subject: {
+      action: 'transfer',
+      token: tok,
+      to: recipient,
+      amount: amt.text,
+      shareOfBalance: judged.note,
+      from: from || null,
+      fromSelf,
+      toSelf,
+    },
   };
 }
 
@@ -446,14 +564,33 @@ function analyzeBatch(batch, ctx) {
     kind: 'batch',
     risk: parts.length === 0 ? 'caution' : risk,
     headline: `${parts.length} actions in one confirmation`,
-    facts: parts.map((p, i) => fact(`Action ${i + 1}`, p.headline, p.risk === 'danger' ? { tone: 'danger' } : {})),
-    reasons: [
+    facts: parts.map((p, i) =>
+      fact(`Action ${i + 1}`, withParty(p), p.risk === 'danger' ? { tone: 'danger' } : {}),
+    ),
+    // The main reason of each part that is high risk or cannot be read.
+    reasons: unique([
       'One confirmation would carry out every action listed above.',
-      ...parts.filter((p) => p.risk === 'danger').flatMap((p) => p.reasons.slice(0, 1)),
-    ],
+      ...parts
+        .filter((p) => p.risk === 'danger' || p.kind === 'contractCall' || p.kind === 'deploy')
+        .flatMap((p) => p.reasons.slice(0, 1)),
+    ]),
     parts,
     subject: { action: 'batch', actions: parts.map((p) => p.subject) },
   };
+}
+
+const unique = (list) => [...new Set(list)];
+
+/** A batch line: what it does and with whom ("Send 0.2 WETH, to 0xa47c1e…00d3b9"). */
+function withParty(part) {
+  const s = part.subject || {};
+  const who = (name, address) => (name ? name : address ? shortAddress(address) : null);
+  let party = null;
+  if (s.action === 'approve' || s.action === 'revoke') party = who(s.spenderName, s.spender) && `spender ${who(s.spenderName, s.spender)}`;
+  else if (s.action === 'approveAll' || s.action === 'revokeAll') party = who(s.operatorName, s.operator) && `operator ${who(s.operatorName, s.operator)}`;
+  else if (s.action === 'transfer' || s.action === 'nativeTransfer') party = s.to && `to ${shortAddress(s.to)}`;
+  else if (s.action === 'contractCall') party = s.contract && `contract ${shortAddress(s.contract)}`;
+  return party ? `${part.headline}, ${party}` : part.headline;
 }
 
 // ── Signatures ─────────────────────────────────────────────────────────────
@@ -512,7 +649,11 @@ function analyzeTypedData(raw, ctx) {
 
   if (verifying === PERMIT2 || /^Permit(Single|Batch|TransferFrom|BatchTransferFrom|WitnessTransferFrom|BatchWitnessTransferFrom)$/.test(primaryType)) {
     const spender = normAddress(message.spender);
-    const details = message.details ?? message.permitted;
+    // Two kinds of Permit2 signature. AllowanceTransfer ("details"): an
+    // allowance with its own end time. SignatureTransfer ("permitted"): the
+    // spender may take the amount once, before the signature's deadline.
+    const once = message.details === undefined && message.permitted !== undefined;
+    const details = once ? message.permitted : message.details;
     const items = (Array.isArray(details) ? details : [details]).filter((d) => d && typeof d === 'object');
     if (spender && items.length > 0) {
       const parts = items.map((item) =>
@@ -523,24 +664,43 @@ function analyzeTypedData(raw, ctx) {
           via: 'Permit2 signature',
           ctx: { ...inner, enrich: { spenderIsContract: inner.enrich.spenderIsContract } },
           unlimitedAt: MAX_UINT160,
+          expires: once ? null : toBigInt(item.expiration),
+          once,
         }),
       );
+      const deadline = once ? message.deadline : message.sigDeadline ?? message.deadline;
       if (parts.length === 1) {
-        return withOffchainNote(parts[0], 'permit2', message.sigDeadline ?? message.deadline);
+        return withOffchainNote(parts[0], 'permit2', deadline);
       }
       const risk = parts.reduce((r, p) => maxRisk(r, p.risk), 'info');
+      const ends = unique(parts.map((p) => p.subject.ends).filter(Boolean));
       return withOffchainNote(
         {
           kind: 'permit2',
           risk,
-          headline: `Spending permissions for ${parts.length} tokens`,
-          facts: parts.map((p, i) => fact(`Token ${i + 1}`, p.headline, p.risk === 'danger' ? { tone: 'danger' } : {})),
-          reasons: parts[0].reasons,
+          headline: once ? `Signature that lets someone take ${parts.length} tokens` : `Spending permissions for ${parts.length} tokens`,
+          facts: [
+            ...parts.map((p, i) => fact(`Token ${i + 1}`, p.headline, p.risk === 'danger' ? { tone: 'danger' } : {})),
+            ...parts[0].facts.filter((f) => f.label === 'Spender' || f.label === 'Network'),
+            ...(ends.length === 1
+              ? [fact('Permissions end', ends[0], ends[0] === 'More than a year from now' ? { tone: 'caution' } : {})]
+              : ends.length > 1
+                ? parts.map((p, i) => fact(`Token ${i + 1} ends`, p.subject.ends || 'unknown'))
+                : []),
+          ],
+          // Every token's reasons: a fake token may be any one of them.
+          reasons: unique(parts.flatMap((p) => p.reasons)),
           parts,
-          subject: { action: 'permit2Batch', actions: parts.map((p) => p.subject) },
+          subject: {
+            action: 'permit2Batch',
+            once,
+            spender,
+            spenderName: parts[0].subject.spenderName,
+            actions: parts.map((p) => p.subject),
+          },
         },
         'permit2',
-        message.sigDeadline ?? message.deadline,
+        deadline,
       );
     }
   }
@@ -584,14 +744,8 @@ function withOffchainNote(result, kind, deadline) {
   const facts = [...result.facts];
   const d = toBigInt(deadline);
   if (d !== null) {
-    const farFuture = d > BigInt(Math.floor(Date.now() / 1000)) + 365n * 24n * 3600n;
-    facts.push(
-      fact(
-        'Valid until',
-        farFuture ? 'More than a year from now' : new Date(Number(d) * 1000).toISOString().slice(0, 16).replace('T', ' '),
-        farFuture ? { tone: 'caution' } : {},
-      ),
-    );
+    const end = when(d);
+    facts.push(fact('Valid until', end.text, end.far ? { tone: 'caution' } : {}));
   }
   return { ...result, kind: result.kind === 'revoke' ? 'revoke' : kind, facts, reasons: [...result.reasons, OFFCHAIN_NOTE] };
 }
@@ -645,6 +799,29 @@ function analyzeMessage(raw, ctx) {
     subject: { action: 'signMessage', readable: true },
     message: text,
   };
+}
+
+/**
+ * The user's own address(es) in a request: the wallet's connected accounts
+ * (read by the in-page guard) and the account that sends or signs it.
+ */
+export function ownAddresses(req) {
+  const out = new Set();
+  const add = (v) => {
+    if (typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v)) out.add(v.toLowerCase());
+  };
+  const params = Array.isArray(req && req.params) ? req.params : [];
+  const method = String((req && req.method) || '');
+  const accounts = req && req.enrich && Array.isArray(req.enrich.accounts) ? req.enrich.accounts : [];
+  accounts.forEach(add);
+  if (/^eth_send|^wallet_sendCalls|^eth_signTransaction/.test(method)) {
+    add(params[0] && params[0].from);
+  } else if (/sign/i.test(method)) {
+    // personal_sign(message, address), eth_sign(address, data),
+    // eth_signTypedData*(address, data): the account is the address param.
+    params.slice(0, 2).forEach(add);
+  }
+  return [...out];
 }
 
 function fact(label, value, extra = {}) {

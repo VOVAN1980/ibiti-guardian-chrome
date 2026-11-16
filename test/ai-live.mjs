@@ -76,7 +76,13 @@ for (let round = 1; round <= ROUNDS; round++) {
     try {
       // 'unavailable' / 'downloadable': no model here and the cloud not allowed (FALLBACK=0).
       await review.waitForFunction(
-        () => ['done', 'error', 'undecoded', 'unavailable', 'downloadable'].includes(document.body.dataset.local),
+        () => {
+          const d = document.body.dataset;
+          return (
+            ['done', 'error', 'undecoded'].includes(d.local) ||
+            (d.fallback === 'off' && ['unavailable', 'downloadable'].includes(d.local))
+          );
+        },
         { timeout: 60000 },
       );
       Object.assign(
@@ -89,10 +95,11 @@ for (let round = 1; round <= ROUNDS; round++) {
           withheld: document.body.dataset.withheld
             ? `${document.body.dataset.withheld} [${document.body.dataset.withheldDetail}]`
             : null,
-          firstMs: Number(document.body.dataset.firstMs) || null,
-          shownMs: Number(document.body.dataset.shownMs) || null,
           ms: Number(document.body.dataset.ms) || null,
-          shown: document.getElementById('local-text').textContent,
+          reading: document.body.dataset.reading || null,
+          sentence: document.getElementById('local-text').textContent,
+          note: document.getElementById('local-note').hidden ? null : document.getElementById('local-note').textContent,
+          top: document.body.dataset.top || '',
           error: document.body.dataset.localError || null,
         })),
       );
@@ -109,6 +116,7 @@ for (let round = 1; round <= ROUNDS; round++) {
           : null,
         patternKind: document.body.dataset.patternKind || null,
         pattern: document.getElementById('cloud-pattern').textContent,
+        reading: document.body.dataset.cloudReading || null,
         chip: document.getElementById('cloud-chip').textContent,
         error: document.body.dataset.cloudError || null,
       }));
