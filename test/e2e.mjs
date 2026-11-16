@@ -65,7 +65,8 @@ async function openReview(scenario) {
 }
 
 async function waitForHistory(length) {
-  await page.waitForFunction((n) => window.__dapp.history.length >= n, { timeout: 10000 }, length);
+  // Timer polling: the default (animation frames) stalls while the page is a background tab.
+  await page.waitForFunction((n) => window.__dapp.history.length >= n, { timeout: 15000, polling: 200 }, length);
 }
 
 await step('read-only calls pass straight through', async () => {
@@ -532,6 +533,100 @@ await step('a request Guardian cannot decode is not explained by any AI, even wi
   }
 });
 
+// However the AI service fails, the facts are there at once and Reject and
+// Continue keep working: the AI is never in the way of the decision.
+let expectedWallet = 1;
+for (const mode of ['unreachable', 'over quota', 'silent', 'timed out']) {
+  await step(`AI service ${mode}: the facts and the decision still work`, async () => {
+    const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
+    const panel = await browser.newPage();
+    await panel.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`, { waitUntil: 'load' });
+    await panel.waitForFunction(() => !/Checking/.test(document.getElementById('fallback-text').textContent));
+    if (await panel.evaluate(() => document.getElementById('fallback').disabled)) {
+      await panel.close();
+      console.log(`     AI ${mode}: SKIPPED, cloud is not set up in this build`);
+      return;
+    }
+    const setFallback = (on) => panel.evaluate((v) => chrome.storage.local.set({ cloudFallback: v }), on);
+    const first = await reviewWithCalls('claim');
+    let tab = null;
+    try {
+      await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
+      await setFallback(true);
+      // A view of the same held request whose calls to the AI service fail.
+      tab = await browser.newPage();
+      await tab.setRequestInterception(true);
+      tab.on('request', (request) => {
+        const url = request.url();
+        if (url.startsWith('chrome-extension://')) return request.continue().catch(() => {});
+        if (mode === 'unreachable') return request.abort('internetdisconnected').catch(() => {});
+        if (!/generatecontent/i.test(url)) return request.continue().catch(() => {});
+        if (mode === 'over quota') {
+          return request
+            .respond({
+              status: 429,
+              contentType: 'application/json',
+              body: JSON.stringify({ error: { code: 429, message: 'You exceeded your current quota.', status: 'RESOURCE_EXHAUSTED' } }),
+            })
+            .catch(() => {});
+        }
+        return undefined; // silent / timed out: the service never answers
+      });
+      tab.goto(first.review.url()).catch(() => {});
+
+      // The facts and both buttons are there before any AI answer.
+      await tab.waitForFunction(() => document.getElementById('badge') && document.getElementById('badge').textContent !== '');
+      const early = await tab.evaluate(() => ({
+        badge: document.getElementById('badge').textContent,
+        headline: document.getElementById('headline').textContent,
+        facts: document.querySelectorAll('.fact').length,
+        reasons: document.querySelectorAll('#reasons li').length,
+        reject: !document.getElementById('reject').disabled,
+        allow: !document.getElementById('allow').disabled,
+      }));
+      assert.deepEqual(
+        { ...early, facts: early.facts >= 4, reasons: early.reasons >= 1 },
+        { badge: 'High risk', headline: 'Unlimited spending permission for USDT', facts: true, reasons: true, reject: true, allow: true },
+      );
+
+      if (mode === 'silent') {
+        // No answer yet and none coming: Reject works at once.
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        assert.notEqual(await tab.evaluate(() => document.body.dataset.local), 'done');
+      } else {
+        const wait = mode === 'timed out' ? 40000 : 20000;
+        await tab.waitForFunction(() => document.body.dataset.local === 'error', { timeout: wait });
+        const said = await tab.evaluate(() => document.getElementById('local-text').textContent);
+        const expected = {
+          unreachable: /could not be reached\. The facts below do not depend on it/,
+          'over quota': /busy right now \(usage limit\)\. The facts below do not depend on it/,
+          'timed out': /did not answer within 30 seconds\. The facts below do not depend on it/,
+        }[mode];
+        assert.match(said, expected);
+      }
+
+      // Continue forwards the request; Reject refuses it.
+      const allow = mode === 'unreachable' || mode === 'timed out';
+      await tab.click(allow ? '#allow' : '#reject');
+      expectedHistory += 1;
+      await waitForHistory(expectedHistory);
+      const last = await dappLast();
+      if (allow) {
+        expectedWallet += 1;
+        assert.equal(last.ok, true, 'Continue forwarded the request');
+      } else {
+        assert.equal(last.code, 4001, 'Reject refused the request');
+      }
+      assert.equal(await walletLog(), expectedWallet);
+    } finally {
+      await setFallback(false).catch(() => {});
+      if (tab) await tab.close().catch(() => {});
+      await panel.close().catch(() => {});
+      await first.review.close().catch(() => {});
+    }
+  });
+}
+
 await step('the toolbar panel says Guardian is on, what this build can do, and opens the test page', async () => {
   const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
   const id = new URL(worker.url()).host;
@@ -571,7 +666,7 @@ await step('if Guardian cannot be reached, the request is refused, not passed', 
   assert.equal(last.ok, false);
   assert.equal(last.code, 4001);
   assert.match(last.message, /could not review/);
-  assert.equal(await walletLog(), 1, 'the wallet did not receive it');
+  assert.equal(await walletLog(), expectedWallet, 'the wallet did not receive it');
   assert.equal(browser.targets().filter((t) => t.url().includes('/review.html')).length, reviewsBefore);
 });
 

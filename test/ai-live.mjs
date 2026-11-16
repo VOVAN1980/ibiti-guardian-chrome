@@ -24,10 +24,10 @@ const page = await browser.newPage();
 await page.goto(DEMO, { waitUntil: 'load' });
 await page.waitForFunction(() => Array.isArray(window.__mockWalletLog));
 
-// Allow the cloud fallback once, as a user would.
+// Allow the cloud fallback once, as a user would (FALLBACK=0: deeper analysis only).
 const setup = await browser.newPage();
 await setup.goto(`chrome-extension://${ext}/popup.html`, { waitUntil: 'load' });
-await setup.evaluate(() => chrome.storage.local.set({ cloudFallback: true }));
+await setup.evaluate((on) => chrome.storage.local.set({ cloudFallback: on }), process.env.FALLBACK !== '0');
 await setup.close();
 
 /** The model's own text inside a Gemini response (streamed or not). */
@@ -74,9 +74,11 @@ for (let round = 1; round <= ROUNDS; round++) {
     });
     const row = { round, scenario };
     try {
-      await review.waitForFunction(() => ['done', 'error', 'undecoded'].includes(document.body.dataset.local), {
-        timeout: 60000,
-      });
+      // 'unavailable' / 'downloadable': no model here and the cloud not allowed (FALLBACK=0).
+      await review.waitForFunction(
+        () => ['done', 'error', 'undecoded', 'unavailable', 'downloadable'].includes(document.body.dataset.local),
+        { timeout: 60000 },
+      );
       Object.assign(
         row,
         await review.evaluate(() => ({

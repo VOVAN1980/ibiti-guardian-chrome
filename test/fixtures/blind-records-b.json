@@ -1,0 +1,154 @@
+{
+ "bnbApprove": {
+  "chainId": 56,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0x55d398326f99059fF775485246999027B3197955",
+    "data": "0x095ea7b30000000000000000000000007a16ff8270133f063aab6c9977183d9e72835428ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": true
+  }
+ },
+ "polTransfer": {
+  "chainId": 137,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0x52c9E1b5A4d36F81D2a6c7E09fAb3D4e5F60718A",
+    "data": "0x",
+    "value": "0xad78ebc5ac620000"
+   }
+  ],
+  "enrich": {
+   "balance": "0x1a055690d9db80000"
+  }
+ },
+ "arbUsdcAll": {
+  "chainId": 42161,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "data": "0xa9059cbb000000000000000000000000b3f7c0000000000000000000000000000000a9d40000000000000000000000000000000000000000000000000000000059682f00"
+   }
+  ],
+  "enrich": {
+   "tokenBalance": "59682f00"
+  }
+ },
+ "daiLimited": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    "data": "0x095ea7b30000000000000000000000007a16ff8270133f063aab6c9977183d9e7283542800000000000000000000000000000000000000000000001b1ae4d6e2ef500000"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": true
+  }
+ },
+ "wethKnown": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "data": "0x095ea7b3000000000000000000000000111111125421ca6dc452d289314280a0f8842a6500000000000000000000000000000000000000000000000006f05b59d3b20000"
+   }
+  ]
+ },
+ "permit2": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_signTypedData_v4",
+  "params": [
+   "0x3333333333333333333333333333333333333333",
+   "{\"types\":{},\"primaryType\":\"PermitSingle\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"details\":{\"token\":\"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\",\"amount\":\"1461501637330902918203684832716283019655932542975\",\"expiration\":4102444800,\"nonce\":0},\"spender\":\"0xB3f7c0000000000000000000000000000000a9D4\",\"sigDeadline\":4102444800}}"
+  ],
+  "enrich": {
+   "spenderIsContract": false
+  }
+ },
+ "nftRevoke": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0x8a90CAb2b38dba80c64b7734e58Ee1dB38B8992e",
+    "data": "0xa22cb465000000000000000000000000b3f7c0000000000000000000000000000000a9d40000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ]
+ },
+ "nftApprove": {
+  "chainId": 8453,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x3333333333333333333333333333333333333333",
+    "to": "0x8a90CAb2b38dba80c64b7734e58Ee1dB38B8992e",
+    "data": "0xa22cb4650000000000000000000000007a16ff8270133f063aab6c9977183d9e728354280000000000000000000000000000000000000000000000000000000000000001"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": true
+  }
+ },
+ "baseSignin": {
+  "chainId": 8453,
+  "origin": "https://app.dex-rewards.example",
+  "method": "personal_sign",
+  "params": [
+   "0x6170702e6465782d726577617264732e6578616d706c652077616e747320796f7520746f207369676e20696e207769746820796f757220457468657265756d206163636f756e743a0a3078333333333333333333333333333333333333333333333333333333333333333333333333333333330a0a4e6f6e63653a20343163376532",
+   "0x3333333333333333333333333333333333333333"
+  ]
+ },
+ "order": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "eth_signTypedData_v4",
+  "params": [
+   "0x3333333333333333333333333333333333333333",
+   "{\"primaryType\":\"OrderComponents\",\"domain\":{\"name\":\"Seaport\",\"version\":\"1.6\",\"chainId\":1},\"message\":{\"offerer\":\"0x3333333333333333333333333333333333333333\",\"offer\":[{},{}]}}"
+  ]
+ },
+ "batch": {
+  "chainId": 1,
+  "origin": "https://app.dex-rewards.example",
+  "method": "wallet_sendCalls",
+  "params": [
+   {
+    "version": "1.0",
+    "chainId": "0x1",
+    "from": "0x3333333333333333333333333333333333333333",
+    "calls": [
+     {
+      "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "data": "0x095ea7b3000000000000000000000000b3f7c0000000000000000000000000000000a9d4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+     },
+     {
+      "to": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "data": "0xa9059cbb000000000000000000000000b3f7c0000000000000000000000000000000a9d40000000000000000000000000000000000000000000000022b1c8c1227a00000"
+     }
+    ]
+   }
+  ]
+ }
+}

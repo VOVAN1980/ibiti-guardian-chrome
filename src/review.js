@@ -310,7 +310,7 @@ async function runLocal(result, host) {
   // already the text that may go to the cloud: no own address, no balance.
   const prompt = hybrid ? cloudExplainPrompt(result, host) : explainPrompt(result, host);
   const sentence = meaning(result, host);
-  const checker = answerChecker(result, sentence, { own, chainId });
+  const checker = answerChecker(result, sentence, { own, chainId, host });
   const started = performance.now();
   let shownMs = null;
   // Once this run has ended (answered, failed or timed out), nothing more
@@ -466,7 +466,7 @@ function wireCloud(result, host) {
       // Every piece is checked against the facts before anything is shown.
       const truthExtra = meaning(result, host);
       const failed = [summary, confirm, name, ...checks]
-        .map((piece) => answerChecker(result, truthExtra, { own, chainId }).finish(piece))
+        .map((piece) => answerChecker(result, truthExtra, { own, chainId, host }).finish(piece))
         .find((v) => v.problem && v.problem !== 'nothing');
       const problem = failed ? failed.problem : null;
       // For tests and logs only; the window never repeats it.
