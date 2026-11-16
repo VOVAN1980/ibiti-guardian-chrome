@@ -16,8 +16,7 @@
     <main>
       <p class="lead">
         <strong>Guardian is watching wallet requests on every site.</strong>
-        When a page asks your wallet to sign or send, Guardian holds the request and opens its own window before your
-        wallet sees it. There is nothing to press here.
+        It holds each one in its own window before your wallet sees it.
       </p>
 
       <dl class="status">
@@ -42,13 +41,14 @@
           <dt>Deeper cloud analysis, only when you ask</dt>
           <dd id="cloud">Checking…</dd>
         </div>
+        <div id="last-row" hidden>
+          <dt>Last explanation</dt>
+          <dd id="last"></dd>
+        </div>
       </dl>
 
       <button class="primary" id="try" type="button">Try it on the test page</button>
-      <p class="hint">
-        Opens our demo site with a demo wallet (no keys, no funds). Press <b>Claim airdrop</b> there and Guardian’s
-        window appears.
-      </p>
+      <p class="hint">A demo site with a demo wallet (no keys, no funds). Press <b>Claim airdrop</b> there.</p>
     </main>
 
     <footer>

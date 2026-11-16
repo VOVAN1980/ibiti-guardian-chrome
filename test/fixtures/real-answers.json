@@ -1,0 +1,622 @@
+{
+ "claim": [
+  {
+   "source": "Gemini Nano, 2026-11-13",
+   "text": "If you confirm, someone else has permission to take unlimited amounts of USDT from your wallet. This could lead to someone using your USDT without your consent until you revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-13",
+   "text": "This request asks you to give an unknown personal wallet unlimited permission to spend your USDT."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-13",
+   "text": "If you confirm, the owner of that personal wallet could take any or all of your USDT at any time without asking you again. This permission remains active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-13",
+   "text": "Verify whether you personally know and trust the owner of the spender wallet address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-13",
+   "text": "Remember that legitimate apps almost always request approval for smart contracts, not personal wallets."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-13",
+   "text": "Check if you actually intended to give an unlimited spending allowance for your USDT."
+  },
+  {
+   "source": "Gemini Nano, 2026-11-16",
+   "text": "If you approve this request, a personal wallet with no connection to the website could get permission to spend unlimited USDT from your wallet, and this permission would remain active until you decide to stop it. This means your USDT could be moved anytime, without you needing to give another confirmation."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDT out of your wallet, at any time, without asking you again, until you revoke it. Because this spender is a personal wallet and not an app contract, they could empty your USDT balance completely now or later."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request gives an unknown personal wallet unlimited permission to spend your USDT at any time."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the unknown wallet can take any amount of USDT out of your wallet without asking you again, and this permission will stay active until you revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know and trust the owner of the spender wallet address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if the website you are using is legitimate and officially associated with the app you intend to use."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm whether the application genuinely requires an unlimited spending allowance."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "Unlimited Token Approval Scam"
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDT out of your wallet, at any time, without asking you again, until you revoke it. As a result, you could lose all of your USDT to this unknown personal wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request gives an unknown personal wallet unlimited permission to take your USDT at any time."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the owner of that personal wallet can move all of your USDT away without your further approval until you manually revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know the owner of the spender address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if the website you are visiting is a legitimate platform."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Review your wallet security settings and past approvals."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16 (2)",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDT out of your wallet, at any time, without asking you again, until you revoke it. As a result, this unknown person could completely empty your USDT balance whenever they want."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, the unknown wallet can take any amount of USDT out of your wallet without asking you again, and this permission will stay active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify if you know and trust the person controlling the spender wallet address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check why a website is asking you to approve a personal wallet instead of a verified application contract."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Confirm whether you intended to grant permanent, unlimited access to your USDT balance."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Unlimited USDT Token Approval to Personal Wallet"
+  }
+ ],
+ "permit": [
+  {
+   "source": "Gemini Nano, 2026-11-13",
+   "text": "If you confirm this request, an unknown wallet, essentially another person's wallet, will gain permission to spend unlimited USDC from your wallet. This means they can move any amount of your USDC without you having to approve each transaction, and this permission will remain active for over a year."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDC out of your wallet, at any time, without asking you again, until you revoke it. As a result, this person could quietly drain all your USDC without you knowing or being able to stop it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to sign away unlimited access to your USDC token balance to an unknown personal wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the unknown person controlling that wallet can take any amount of USDC from you at any time without further warning, and the permission will remain active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know and trust the website asking for this permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check why a personal wallet rather than an official smart contract needs your token approval."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm whether you intended to grant unlimited spending access to your USDC."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "Unlimited Token Approval Scam"
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDC out of your wallet, at any time, without asking you again, until you revoke it. This could result in you losing all of your USDC to this unknown person without any warning or history in your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to sign away unlimited permission for an unknown personal wallet to take your USDC."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the unknown person controlling that wallet can drain all of your USDC at any time without asking you again. The permission will remain active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know and trust the owner of the spender address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if legitimate applications are being used instead of unknown sites."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16 (2)",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take any amount of USDC out of your wallet, at any time, without asking you again, until you revoke it. As a result, you could lose all of your USDC to this unknown person."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request is a digital signature giving an unknown personal wallet unlimited permission to spend your USDC."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, the unknown person owning that wallet will be able to take any amount of your USDC at any time without asking you again. This permission will remain active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check why a website is asking you to approve a personal wallet instead of an official contract."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Consider whether you actually intend to grant unlimited access to your USDC balance."
+  }
+ ],
+ "nft": [
+  {
+   "source": "Gemini Nano, 2026-11-13",
+   "text": "If you confirm, another wallet will get permission to move all of your items in this collection. This means they could take them even if you change your mind later."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address, gets permission to move every item you own in this collection, now or later, until you revoke it. This could result in the operator transferring every item you own in this collection without asking again, and since the spender is an unknown personal wallet instead of a contract, it is a high risk."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to grant an unknown personal wallet total control over all items you own in a specific NFT collection."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the unknown person will be able to transfer every item you currently own, or might acquire later in this collection, without asking for your permission again."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know and trust the operator address requesting access."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check why a personal wallet is asking for collection-wide approval instead of a recognized marketplace contract."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm whether you intended to give away permanent control over your NFTs."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "Unlimited NFT Collection Approval"
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address, gets permission to move every item you own in this collection, now or later, until you revoke it. This matters because the operator could transfer every item you own in this collection, now or later, without asking again, and the spender is a personal wallet while the operator address is unknown."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to grant an unknown personal wallet full permission to manage and transfer all your NFTs in a specific collection."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, that unknown person will be able to take every item you currently own in this collection, as well as any you acquire in the future, without needing your permission again."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if you intended to give a personal wallet control over your NFTs."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Remember that legitimate projects almost always use smart contracts rather than personal wallets for approvals."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "NFT SetApprovalForAll Drainer"
+  },
+  {
+   "source": "cloud fallback, 2026-11-16 (2)",
+   "text": "If you confirm, someone else, an unknown address, gets permission to move every item you own in this collection, now or later, until you revoke it. This matters because that operator could transfer every item you own in this collection, now or later, without asking again, and the spender is a personal wallet instead of a contract while being an unknown address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request asks you to give an unknown personal wallet total control over all items you own or will ever own in a specific NFT collection."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, the unknown person will be able to take and transfer every item you own in this collection at any time without asking you again."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify if you know and trust the operator address asking for permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check why a personal wallet rather than an official marketplace contract is requesting access."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Confirm whether you intended to give away permanent control of your collection items."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "NFT Collection Approval For All"
+  }
+ ],
+ "transfer": [
+  {
+   "source": "Gemini Nano, 2026-11-16",
+   "text": "Confirming this transaction means 0.01 ETH will leave your wallet and be sent to a specific address. However, you cannot get your ETH back once it's confirmed, so be sure you trust the destination address before confirming."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, 0.01 ETH leaves your wallet and goes to 0x9f3a00000000000000000000000000000000c21e. This sends coins straight to the address above, and a confirmed transfer cannot be undone."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request is a direct transfer of 0.01 ETH from your wallet to the specified address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, 0.01 ETH will leave your wallet immediately and go to the recipient address. A confirmed transfer cannot be undone."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify that you know and trust the recipient address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm that you intended to send this exact amount of ETH."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check that you are interacting with the correct website."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request is a direct transfer of 0.01 ETH from your wallet to the address 0x9f3a00000000000000000000000000000000c21e."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, 0.01 ETH will leave your wallet permanently. A confirmed transfer cannot be undone."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify that you intended to send funds to this specific address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Confirm you trust the recipient before proceeding."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Double-check the exact amount of ETH being sent."
+  }
+ ],
+ "blind": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, you sign data that cannot be read. Such a signature can authorise anything."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to sign unreadable raw data using a method called eth_sign that is no longer used by legitimate applications."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "By confirming, you provide a signature that cannot be read, which can be used to authorize anything, including unauthorized transactions from your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you trust the website asking for this signature."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check why the website is using an outdated signing method that most wallets disable."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "{\n  \"summary\": \"This is a blind signature request that asks you to sign raw, unreadable data.\",\n  \"ifYouConfirm\": \"If you confirm, you authorize a signature that cannot be read and could be used for any action on your wallet.\",\n  \"patternKind\": \"cannot_determine\",\n  \"checks\": [\n    \"Check if you expected to sign raw data from this website.\",\n    \"Verify if the application is trustworthy and uses modern signing methods.\"\n  ]\n}"
+  }
+ ],
+ "fake": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take up to 1 USDT out of your wallet, at any time, without asking you again, until you revoke it. Because this is a personal wallet instead of a real app contract, and the token is unverified, you could lose your funds to a stranger."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to give an unknown personal wallet permission to spend up to 1 USDT from your account on the Ethereum network."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, that unknown personal wallet can take up to 1 USDT from your wallet at any time without asking you again, and the permission will remain active until you manually revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you know and trust the owner of the spender address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if the token is the official USDT contract on Ethereum rather than an unverified copy."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm whether you intended to give spending approval to a personal wallet instead of a verified application contract."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "Fake USDT Token Approval"
+  },
+  {
+   "source": "cloud fallback, 2026-11-16 (2)",
+   "text": "If you confirm, someone else, an unknown address (a personal wallet), gets permission to take up to 1 USDT out of your wallet, at any time, without asking you again, until you revoke it. Because this is a personal wallet and an unverified token instead of a real app, you could lose your funds to a stranger."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request asks you to give an unknown personal wallet permission to take up to 1 USDT from your account."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, that unknown person will be able to take up to 1 USDT from your wallet at any time without asking you again, until you manually revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify if you know and trust the address asking for this permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check if you intended to interact with an unverified token on Ethereum."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Remember that legitimate applications use smart contracts, not personal wallets, to handle approvals."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Fake Token Allowance"
+  }
+ ],
+ "phish": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, you sign a sign-in message for nft-market.example, but the request comes from 127.0.0.1:5179, a different site. A signature made here could be used to log in there as you."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to sign a message that logs you into nft-market.example while you are visiting a different website."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, the website you are currently on could use your signature to log into nft-market.example and act as you there."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify if you intended to log into nft-market.example."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check if the website address in your browser matches the service you expect to use."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Be cautious when a login request comes from an unexpected or local network address."
+  },
+  {
+   "source": "cloud deep analysis (pattern name), 2026-11-16",
+   "text": "Cross-site signature impersonation"
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request asks you to sign a message that logs you into nft-market.example while you are visiting a different website at 127.0.0.1:5179."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "If you confirm, the current website at 127.0.0.1:5179 will receive a valid login signature for your account on nft-market.example."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify if you intended to log in to nft-market.example."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check why the website asking for the signature is 127.0.0.1:5179 instead of the official marketplace domain."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Cross-site signature spoofing"
+  }
+ ],
+ "limited": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, Uniswap Permit2, a well-known service, gets permission to take up to 25 USDC out of your wallet, at any time, without asking you again, until you revoke it. This means the spender could move up to 25 USDC from your wallet without asking again, and the permission stays active until you revoke it."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to give Uniswap Permit2 permission to spend up to 25 USDC from your wallet on the Ethereum network."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "If you confirm, Uniswap Permit2 will be able to take up to 25 USDC from your wallet at any time without further prompts until you explicitly revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm that you intended to grant spending permission for USDC to this application."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify that the amount of 25 USDC matches what you expect to spend."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, Uniswap Permit2, a well-known service, gets permission to take up to 25 USDC out of your wallet, at any time, without asking you again, until you revoke it. No red flags were found with this request."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request asks you to grant Uniswap Permit2 permission to spend up to 25 USDC from your wallet on Ethereum."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Uniswap Permit2 will be able to take up to 25 USDC from your wallet at any time without asking you again, until you manually revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify that you intended to interact with Uniswap Permit2."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm that you are comfortable with the requested spending limit of 25 USDC."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request asks you to grant Uniswap Permit2 permission to spend up to 25 USDC from your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Uniswap Permit2 will be able to take up to 25 USDC out of your wallet at any time without asking you again, until you manually revoke the permission."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify that you intended to interact with Uniswap."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Confirm that you are comfortable allowing up to 25 USDC to be spent."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check that you are on the correct official website."
+  }
+ ],
+ "signin": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, you sign in to \"127.0.0.1:5179\". Nothing leaves your wallet. This action only proves you own the wallet and does not move funds or grant spending permissions."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request is simply a sign-in message to prove you own your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "By confirming, you will successfully log into 127.0.0.1:5179. No funds will leave your wallet and no spending permissions are granted."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify you intended to sign into 127.0.0.1:5179."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm that no cryptocurrency or tokens are being moved."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, you sign in to \"127.0.0.1:5179\". Nothing leaves your wallet. This just proves you own the wallet and does not move funds or grant spending permissions."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "By confirming, you will successfully sign in to 127.0.0.1:5179. No funds will leave your wallet and no spending permissions will be granted."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify that you intended to log into 127.0.0.1:5179."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Confirm that the request only asks to sign in and does not mention transferring funds."
+  },
+  {
+   "source": "cloud fallback, 2026-11-16 (2)",
+   "text": "If you confirm, you sign in to \"127.0.0.1:5179\". Nothing leaves your wallet. This action only proves you own your wallet and does not move your funds or give spending permissions."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request is simply a sign-in message to prove you own your wallet, and no funds or permissions are transferred."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "By confirming, you will successfully sign in to 127.0.0.1:5179. No assets will leave your wallet and no spending permissions will be granted."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Confirm the request only asks for a sign-in and not a token transfer or approval."
+  }
+ ],
+ "revoke": [
+  {
+   "source": "cloud fallback, 2026-11-16",
+   "text": "If you confirm, an existing permission is removed. Nothing leaves your wallet. This sets the allowance to zero, so the spender can no longer move this token."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request removes an existing permission that previously allowed a specific app to access your USDT."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "After confirming, that app will no longer be able to spend or move your USDT. Nothing will leave your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify you intended to revoke spending permissions for USDT."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check that you recognize the website asking for this action."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "This request removes an existing permission that allowed another application to access your USDT on the Ethereum network."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Once confirmed, that application will no longer be able to spend or move your USDT, and no tokens will leave your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Verify that you intended to revoke access for this specific spender address."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16",
+   "text": "Check that you are interacting with the correct wallet management tool."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "This request is to remove an existing permission that allowed an application to spend USDT from your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Once confirmed, that application will no longer be able to touch or move your USDT tokens. No tokens will leave your wallet."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Verify that you intended to disconnect or revoke access for this specific application."
+  },
+  {
+   "source": "cloud deep analysis, 2026-11-16 (2)",
+   "text": "Check that you are interacting with a legitimate wallet management interface."
+  }
+ ]
+}

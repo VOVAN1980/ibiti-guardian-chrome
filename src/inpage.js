@@ -196,6 +196,11 @@
         const n = typeof v === 'string' ? parseInt(v, 16) : typeof v === 'number' ? v : NaN;
         if (Number.isFinite(n)) context.chainId = n;
       }),
+      // The user's own accounts, so Guardian can keep them out of anything
+      // that may go to the cloud. Read-only; the wallet does not ask.
+      withTimeout(call({ method: 'eth_accounts' }), 1500).then((v) => {
+        if (Array.isArray(v)) context.enrich.accounts = v.filter(isAddress).slice(0, 10);
+      }),
     ];
     if (target && isAddress(target.spender)) {
       jobs.push(

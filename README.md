@@ -82,6 +82,22 @@ the SDK falls back to Gemini in the cloud on computers without it.
   written by code, on who would be allowed to do what — small models tend to
   swap the roles in an approval (`src/ai/prompt.js`).
 - The model explains; it never decides what the request is or how risky it is.
+- **Checked before it is shown** (`src/ai/guard.js`). Each sentence appears
+  only after code has checked it against the request: every address, every
+  amount together with its token (*0.01 ETH* passes only where the request
+  moves 0.01 ETH), every other number and token name, *unlimited* or
+  *everything*, who gets what, and any wording that calls the request safe —
+  Guardian never says *safe*, and neither may its AI. The answer stops at
+  the first sentence that fails; if nothing passed, the window shows a
+  sentence written by code and says what was wrong, without repeating it.
+  150 recorded real Gemini answers pass (`test/fixtures/real-answers.json`);
+  deliberately wrong ones are caught (`test/guard.test.js`). These checks
+  catch what code can verify; they do not prove an explanation right.
+- **No guessing.** A request the analyzer cannot decode (a blind signature,
+  an unknown contract call or data format) gets no AI explanation at all.
+- Text a website writes itself (an app name, a sign-in domain) goes into
+  prompts quoted and short, as data; an unverified token's symbol is kept
+  only if it is a plain ticker.
 - No Gemini API key is in the extension. Firebase AI Logic is the gateway
   (`src/ai/engine.js`).
 - If no AI answers at all (no on-device model and no permission for the

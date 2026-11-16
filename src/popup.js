@@ -38,6 +38,27 @@ if (!aiBuilt) {
 if (aiBuilt && cloudReady) show('cloud', 'Set up: a button in Guardian’s window', 'ok');
 else show('cloud', 'Not set up in this build', 'off');
 
+// Where the last explanation ran and how long it took (review.js keeps it).
+const { lastExplanation: last } = await chrome.storage.local.get('lastExplanation');
+if (last && typeof last.at === 'number') {
+  const s = (ms) => `${(ms / 1000).toFixed(1)} s`;
+  const when = new Date(last.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const where = last.source === 'on_device' ? 'On device' : last.source === 'in_cloud' ? 'Cloud' : 'AI';
+  const parts = last.error
+    ? [when, where, `no answer: ${last.error}`]
+    : [
+        when,
+        where,
+        typeof last.firstMs === 'number' ? `first words ${s(last.firstMs)}` : null,
+        typeof last.shownMs === 'number' ? `shown ${s(last.shownMs)}` : null,
+        typeof last.ms === 'number' ? `done ${s(last.ms)}` : null,
+        `${last.requests ?? '?'} network requests from Guardian’s window`,
+        last.checked === 'withheld' ? 'answer withheld by the checks' : last.checked === 'cut' ? 'answer cut short by the checks' : null,
+      ];
+  show('last', parts.filter(Boolean).join(' · '), !last.error && last.source === 'on_device' && last.requests === 0 ? 'ok' : 'off');
+  $('last-row').hidden = false;
+}
+
 // The one-time permission for the hybrid fallback (same key as host.js).
 const fallback = $('fallback');
 const fallbackText = (on) => {
