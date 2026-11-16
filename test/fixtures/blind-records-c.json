@@ -1,0 +1,157 @@
+{
+ "polyLimitedPerson": {
+  "chainId": 137,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+    "data": "0x095ea7b30000000000000000000000006c0de0000000000000000000000000000000f1a80000000000000000000000000000000000000000000000000000000077359400"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": false
+  }
+ },
+ "baseQuarter": {
+  "chainId": 8453,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "data": "0xa9059cbb0000000000000000000000002e7b94c1a5d80f63b49ca7e0d15f8a3c6b9e4d1700000000000000000000000000000000000000000000000000000000047868c0"
+   }
+  ],
+  "enrich": {
+   "tokenBalance": "0x11e1a300"
+  }
+ },
+ "bnbAll": {
+  "chainId": 56,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x6c0de0000000000000000000000000000000F1a8",
+    "data": "0x",
+    "value": "0xb1a2bc2ec500000"
+   }
+  ],
+  "enrich": {
+   "balance": "0xb1a2bc2ec500000"
+  }
+ },
+ "wethPermit2": {
+  "chainId": 1,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "data": "0x095ea7b3000000000000000000000000000000000022d473030f116ddee9f6b43ac78ba3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+   }
+  ]
+ },
+ "daiPermit": {
+  "chainId": 1,
+  "origin": "https://trade-hub.example",
+  "method": "eth_signTypedData_v4",
+  "params": [
+   "0x4444444444444444444444444444444444444444",
+   "{\"types\":{},\"primaryType\":\"Permit\",\"domain\":{\"name\":\"Dai Stablecoin\",\"version\":\"1\",\"chainId\":1,\"verifyingContract\":\"0x6B175474E89094C44Da98b954EedeAC495271d0F\"},\"message\":{\"holder\":\"0x4444444444444444444444444444444444444444\",\"spender\":\"0xD41c6B3e9A0f27C85b14E6a7F3920d8C5e1B7A60\",\"nonce\":3,\"expiry\":4102444800,\"allowed\":true}}"
+  ],
+  "enrich": {
+   "spenderIsContract": true
+  }
+ },
+ "polyNftAll": {
+  "chainId": 137,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x71C4a9E20b6F583D0a17cE94B2f8D35A60E9c8B2",
+    "data": "0xa22cb4650000000000000000000000006c0de0000000000000000000000000000000f1a80000000000000000000000000000000000000000000000000000000000000001"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": false
+  }
+ },
+ "baseRevoke": {
+  "chainId": 8453,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "data": "0x095ea7b3000000000000000000000000d41c6b3e9a0f27c85b14e6a7f3920d8c5e1b7a600000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ]
+ },
+ "phishBrand": {
+  "chainId": 1,
+  "origin": "https://trade-hub.example",
+  "method": "personal_sign",
+  "params": [
+   "0x6f70656e7365612e696f2077616e747320796f7520746f207369676e20696e207769746820796f757220457468657265756d206163636f756e743a0a3078343434343434343434343434343434343434343434343434343434343434343434343434343434340a0a4e6f6e63653a20396430316162",
+   "0x4444444444444444444444444444444444444444"
+  ]
+ },
+ "permit2Two": {
+  "chainId": 1,
+  "origin": "https://trade-hub.example",
+  "method": "eth_signTypedData_v4",
+  "params": [
+   "0x4444444444444444444444444444444444444444",
+   "{\"types\":{},\"primaryType\":\"PermitBatch\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"details\":[{\"token\":\"0xdAC17F958D2ee523a2206206994597C13D831ec7\",\"amount\":\"1461501637330902918203684832716283019655932542975\",\"expiration\":4102444800,\"nonce\":0},{\"token\":\"0x6B175474E89094C44Da98b954EedeAC495271d0F\",\"amount\":\"150000000000000000000\",\"expiration\":4102444800,\"nonce\":0}],\"spender\":\"0x6c0de0000000000000000000000000000000F1a8\",\"sigDeadline\":4102444800}}"
+  ],
+  "enrich": {
+   "spenderIsContract": false
+  }
+ },
+ "arbFake": {
+  "chainId": 42161,
+  "origin": "https://trade-hub.example",
+  "method": "eth_sendTransaction",
+  "params": [
+   {
+    "from": "0x4444444444444444444444444444444444444444",
+    "to": "0x5E1f00000000000000000000000000000000Ab37",
+    "data": "0x095ea7b3000000000000000000000000d41c6b3e9a0f27c85b14e6a7f3920d8c5e1b7a60ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+   }
+  ],
+  "enrich": {
+   "spenderIsContract": true,
+   "token": {
+    "symbol": "USDC",
+    "decimals": 6
+   }
+  }
+ },
+ "polyOrder": {
+  "chainId": 137,
+  "origin": "https://trade-hub.example",
+  "method": "eth_signTypedData_v4",
+  "params": [
+   "0x4444444444444444444444444444444444444444",
+   "{\"primaryType\":\"OrderComponents\",\"domain\":{\"name\":\"Seaport\",\"version\":\"1.6\",\"chainId\":137},\"message\":{\"offerer\":\"0x4444444444444444444444444444444444444444\",\"offer\":[{}]}}"
+  ]
+ },
+ "textMessage": {
+  "chainId": 1,
+  "origin": "https://trade-hub.example",
+  "method": "personal_sign",
+  "params": [
+   "0x4920616772656520746f20746865205465726d73206f662053657276696365206f662074726164652d6875622e6578616d706c652e",
+   "0x4444444444444444444444444444444444444444"
+  ]
+ }
+}

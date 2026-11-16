@@ -79,7 +79,7 @@ const R = Object.fromEntries(Object.entries(RECORDS).map(([name, record]) => [na
 /** "reason (detail)": the reason the window shows, and what was wrong. */
 const verdict = (name, text) => {
   const result = R[name];
-  const checker = answerChecker(result, meaning(result, HOST), { own: [ME], chainId: 1 });
+  const checker = answerChecker(result, meaning(result, HOST), { own: [ME], chainId: 1, host: HOST });
   checker.push(text);
   const out = checker.finish(text);
   return out.problem === null ? null : `${out.problem} (${out.detail})`;
@@ -167,9 +167,9 @@ test('a token that is not in the request is caught', () => {
 });
 
 test('"unlimited" or "everything" for a limited request is caught', () => {
-  caught('limited', 'A known service could take any amount of your USDC.', /unlimited amount/);
-  caught('limited', 'A known service could take all your USDC.', /unlimited amount/);
-  caught('transfer', 'You could lose everything.', /unlimited amount/);
+  caught('limited', 'A known service could take any amount of your USDC.', /more is at stake/);
+  caught('limited', 'A known service could take all your USDC.', /more is at stake/);
+  caught('transfer', 'You could lose everything.', /more is at stake/);
   passes('blind', 'Whoever holds this signature could do anything with your wallet.');
 });
 
@@ -246,12 +246,14 @@ test('"If you confirm, …" does not switch the safety check off (review 2026-11
 test('the user is never told they get the permission, in any phrasing', () => {
   caught('claim', "If you confirm, you'll get permission to spend USDT.", /you get the permission/);
   caught('claim', 'If you confirm, you will get unlimited permission to spend USDT.', /you get the permission/);
-  caught('claim', 'If you confirm, you are granted permission to spend USDT held by 0x9f3a…c21e.', /you get the permission/);
+  caught('claim', 'If you confirm, you are granted permission to spend USDT held by 0x9f3a…c21e.', /you get the permission|owner of the assets/);
   caught('claim', 'If you confirm, your wallet can spend any amount of USDT from 0x9f3a…c21e.', /you get the permission/);
 });
 
 test('correct answers found wrongly withheld in the review now pass', () => {
-  passes('claim', 'This is a standard token approval, but the spender is an unknown personal wallet, so it could take all of your USDT at any time.');
+  // Saying how it LOOKS and then "but" concedes; saying it IS standard claims (blind set A, 2026-11-17).
+  caught('claim', 'This is a standard token approval, but the spender is an unknown personal wallet, so it could take all of your USDT at any time.', /cannot confirm/);
+  passes('permit', 'This request looks like a harmless signature, but it is really an unlimited spending permission for your USDC.');
   passes('claim', 'Although it looks like a normal approval request, a personal wallet would get permission to take any amount of your USDT.');
   passes('claim', 'To be safe, verify who owns the spender address before you continue.');
   passes('claim', 'Approving a personal wallet is a common tactic used by scammers.');
@@ -262,7 +264,10 @@ test('correct answers found wrongly withheld in the review now pass', () => {
   passes('limited', 'This is limited to 25 USDC, not an unlimited amount.');
   passes('revoke', 'If you confirm, the permission for 0x9f3a00…00c21e to spend your USDT is removed, so it can no longer take any amount of USDT.');
   passes('signin', 'Signing in only proves you own this wallet; it does not move any ETH or tokens.');
-  passes('phish', 'It does not move any ETH, but someone could use it to log in to nft-market.example as you.');
+  // On a flagged request the AI may not say what cannot happen, even where
+  // it happens to be true: Guardian cannot verify it. The token itself is fine.
+  caught('phish', 'It does not move any ETH, but someone could use it to log in to nft-market.example as you.', /cannot confirm/);
+  passes('phish', 'Someone could use this signature to log in to nft-market.example as you, even though no ETH is involved.');
   passes('unknownCall', 'This calls an unknown function (0xdeadbeef), so no one can say what it will do.');
   passes('oddAmount', 'If you confirm, about 0.0077 ETH leaves your wallet and goes to 0x9f3a…c21e.');
   caught('oddAmount', 'If you confirm, about 0.0090 ETH leaves your wallet.', /amount/);
@@ -275,6 +280,36 @@ test('harmless numbers in advice pass; invented ones still do not', () => {
   passes('claim', '1. Verify who owns the spender address.');
   caught('claim', 'This permission expires in 30 days.', /number/);
   caught('claim', 'Revoke it within 24 hours.', /number/);
+});
+
+// The cause of a real failure (2026-11-16): a correct cloud answer was
+// withheld as "a number that is not in this request". The model had named
+// the site that asked, 127.0.0.1:5179, which the prompt tells it; the checks
+// did not know the site, so its digits looked made up. Found from 683
+// recorded real answers: the only numbers in them are the request's amounts
+// and that site's address.
+test('an answer may name the site that asked; a site it was not told is still caught', () => {
+  const text = 'Check why the website 127.0.0.1:5179 is asking for unlimited access to your USDT.';
+  const sentence = meaning(R.claim, HOST);
+  // As it failed: without the site.
+  assert.equal(answerChecker(R.claim, sentence, { own: [ME], chainId: 1 }).finish(text).problem, 'a number that is not in this request');
+  // As the window runs it now.
+  assert.equal(answerChecker(R.claim, sentence, { own: [ME], chainId: 1, host: HOST }).finish(text).problem, null);
+  const live = 'ibiti-guardian-chrome.web.app';
+  const named = `The site ${live} is asking for unlimited access to your USDT.`;
+  assert.equal(answerChecker(R.claim, sentence, { own: [ME], chainId: 1, host: live }).finish(named).problem, null);
+  assert.match(
+    answerChecker(R.claim, sentence, { own: [ME], chainId: 1, host: live }).finish('The site free-usdt-claim.com is asking for access.').problem,
+    /site or name that is not in this request/,
+  );
+});
+
+// Two real cloud answers that were wrongly withheld (found in 90 runs,
+// 2026-11-17): advice starting with "Confirm …" was read as a claim.
+test('advice that starts with "Confirm" is advice', () => {
+  passes('claim', 'Confirm you are interacting with an official service rather than an unknown website.');
+  passes('claim', 'Confirm if the website you are visiting is a legitimate service.');
+  caught('claim', 'If you confirm, an official service gets the permission.', /verified/);
 });
 
 test('the withheld note never repeats what the model made up', () => {

@@ -83,16 +83,25 @@ the SDK falls back to Gemini in the cloud on computers without it.
   swap the roles in an approval (`src/ai/prompt.js`).
 - The model explains; it never decides what the request is or how risky it is.
 - **Checked before it is shown** (`src/ai/guard.js`). Each sentence appears
-  only after code has checked it against the request: every address, every
-  amount together with its token (*0.01 ETH* passes only where the request
-  moves 0.01 ETH), every other number and token name, *unlimited* or
-  *everything*, who gets what, and any wording that calls the request safe —
-  Guardian never says *safe*, and neither may its AI. The answer stops at
-  the first sentence that fails; if nothing passed, the window shows a
-  sentence written by code and says what was wrong, without repeating it.
-  150 recorded real Gemini answers pass (`test/fixtures/real-answers.json`);
-  deliberately wrong ones are caught (`test/guard.test.js`). These checks
-  catch what code can verify; they do not prove an explanation right.
+  only after code has checked these things against the request:
+  - addresses: each one is an address of this request;
+  - amounts: each one goes with its own token (*0.01 ETH* passes only where
+    the request moves 0.01 ETH); other numbers, percentages and token names
+    must be in the facts;
+  - *unlimited* or *everything* only where the facts say so;
+  - roles: not "you get the permission" or "the funds come to you" where the
+    other party gets them;
+  - no wording that calls the request safe, harmless or normal (Guardian
+    never calls a request safe).
+
+  The answer stops at the first sentence that fails; if nothing passed, the
+  window shows a sentence written by code and says what was wrong, without
+  repeating it. These checks catch these classes of mistakes only. An
+  explanation can still be vague, incomplete or misleading in ways code
+  cannot detect; the facts and the risk level next to it are what Guardian
+  stands behind. 381 recorded real Gemini answers pass
+  (`test/fixtures/real-answers.json`); deliberately wrong ones are caught
+  (`test/guard.test.js`).
 - **No guessing.** A request the analyzer cannot decode (a blind signature,
   an unknown contract call or data format) gets no AI explanation at all.
 - Text a website writes itself (an app name, a sign-in domain) goes into
