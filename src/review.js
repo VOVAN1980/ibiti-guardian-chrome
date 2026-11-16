@@ -1,12 +1,20 @@
 // Guardian's own review window (an extension page the site cannot touch; in
 // the hosted demo, the same page shown in a frame).
 // Facts and the risk level come from the deterministic analyzer. The AI only
-// explains them: on this computer by default, in the cloud only on request.
+// explains them: on this computer by default; in the cloud only when the user
+// has allowed it (the hybrid fallback) or asks for the deeper analysis.
 
 import { analyze } from './analyzer/index.js';
-import { analyzeInCloud, cloudReady, deviceModelStatus, downloadDeviceModel, explainOnDevice } from './ai/engine.js';
+import {
+  analyzeInCloud,
+  cloudReady,
+  deviceModelStatus,
+  downloadDeviceModel,
+  explainHybrid,
+  explainOnDevice,
+} from './ai/engine.js';
 import { deepPrompt, explainPrompt } from './ai/prompt.js';
-import { closeReview, isPreview, loadReview, sendDecision } from './host.js';
+import { allowCloudFallback, closeReview, cloudFallbackAllowed, isPreview, loadReview, sendDecision } from './host.js';
 
 const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'No red flags found' };
 const $ = (id) => document.getElementById(id);
@@ -107,68 +115,166 @@ function render(record, result) {
   $('allow').textContent = safeIsReject ? 'Continue anyway' : 'Continue to wallet';
 }
 
-// ── On-device explanation: starts by itself, no AI service is contacted ──
+// ── Short explanation: on this computer by default; with the user's
+// permission, the SDK's hybrid mode falls back to the cloud when this
+// computer has no on-device model ──
 
-function setChip(element, source, ms) {
+function setChip(element, source, ms, label) {
   element.dataset.source = source;
-  element.textContent = `${source === 'on_device' ? 'On device' : 'Cloud'} · ${seconds(ms)}`;
+  element.textContent = `${source === 'on_device' ? 'On device' : label || 'Cloud'} · ${seconds(ms)}`;
   element.hidden = false;
+}
+
+function offerDownload(result, host) {
+  const download = $('local-download');
+  download.hidden = false;
+  download.disabled = false;
+  download.onclick = async () => {
+    download.disabled = true;
+    try {
+      await downloadDeviceModel((percent) => {
+        download.textContent = `Downloading the model… ${percent}%`;
+      });
+      download.hidden = true;
+      await runLocal(result, host);
+    } catch (error) {
+      download.disabled = false;
+      download.textContent = 'Download failed. Try again';
+      console.warn('[Guardian] model download failed', error);
+    }
+  };
+}
+
+/** Shows the exact text that would be (or was) sent to the cloud. */
+function showSent(prompt, sent) {
+  $('local-sent').textContent = prompt;
+  $('local-sent-label').textContent = sent ? 'Exactly what was sent' : 'Exactly what would be sent';
+  $('local-sent-box').hidden = false;
+}
+
+/** The one-time permission, offered only when this computer has no model. */
+function offerFallback(result, host) {
+  if (!cloudReady) return;
+  if (isPreview) {
+    $('local-fallback-note').textContent =
+      'Gemini in the cloud then explains instead, through Firebase, for the rest of this visit whenever this browser ' +
+      'has no on-device model. Sends the decoded details below, never your wallet address.';
+  }
+  showSent(explainPrompt(result, host, { cloud: true }), false);
+  $('local-fallback').hidden = false;
+  const allow = $('local-fallback-allow');
+  allow.onclick = async () => {
+    allow.disabled = true;
+    await allowCloudFallback();
+    $('local-fallback').hidden = true;
+    $('local-download').hidden = true;
+    await runLocal(result, host);
+  };
+}
+
+// A cloud call that never starts (on the hosted demo, reCAPTCHA blocked by a
+// privacy tool or a network filter) must not leave the window waiting.
+const CLOUD_TIMEOUT_MS = 30000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`no answer within ${ms / 1000} s`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+/** Why a cloud call failed, in words the user can act on. */
+function cloudProblem(error) {
+  const message = String((error && error.message) || error);
+  if (/free tier is not available|billing/i.test(message)) {
+    return 'Cloud AI is not switched on for this Firebase project yet.';
+  }
+  if (/quota|429|resource.exhausted/i.test(message)) return 'The cloud AI is busy right now (usage limit).';
+  return 'The cloud could not be reached.';
 }
 
 async function runLocal(result, host) {
   const text = $('local-text');
   const meta = $('local-meta');
-  const download = $('local-download');
   const status = await deviceModelStatus();
+  const deviceReady = status === 'available';
+  const canDownload = status === 'downloadable' || status === 'downloading';
+  const hybrid = cloudReady && (await cloudFallbackAllowed());
   document.body.dataset.local = status;
+  document.body.dataset.fallback = hybrid ? 'on' : 'off';
 
-  if (status === 'unavailable') {
+  // Nothing from an earlier answer in this window may stay on screen.
+  $('local-chip').hidden = true;
+  $('local-sent-box').hidden = true;
+  meta.hidden = true;
+  delete document.body.dataset.source;
+
+  if (!deviceReady && !hybrid) {
     text.classList.remove('pending');
-    text.classList.add('muted');
-    text.textContent = 'On-device AI is not available in this browser. The facts below do not depend on it.';
+    if (canDownload) {
+      text.textContent = 'The on-device model is not downloaded yet.';
+      offerDownload(result, host);
+    } else {
+      text.classList.add('muted');
+      text.textContent = 'On-device AI is not available in this browser. The facts below do not depend on it.';
+    }
+    offerFallback(result, host);
     return;
   }
 
-  if (status === 'downloadable' || status === 'downloading') {
-    text.classList.remove('pending');
-    text.textContent = 'The on-device model is not downloaded yet.';
-    download.hidden = false;
-    download.onclick = async () => {
-      download.disabled = true;
-      try {
-        await downloadDeviceModel((percent) => {
-          download.textContent = `Downloading the model… ${percent}%`;
-        });
-        download.hidden = true;
-        await runLocal(result, host);
-      } catch (error) {
-        download.disabled = false;
-        download.textContent = 'Download failed. Try again';
-        console.warn('[Guardian] model download failed', error);
-      }
-    };
-    return;
-  }
-
+  $('local-fallback').hidden = true;
+  text.classList.remove('muted');
   text.classList.add('pending');
-  text.textContent = 'Explaining on this computer';
+  text.textContent = deviceReady ? 'Explaining on this computer' : 'Explaining';
+  // With Gemini Nano ready the hybrid call cannot reach the cloud (no App
+  // Check on that app), so the prompt may keep what stays on this computer.
+  const prompt = explainPrompt(result, host, { cloud: hybrid && !deviceReady });
   try {
-    const out = await explainOnDevice(explainPrompt(result, host), (partial) => {
+    const onText = (partial) => {
       text.classList.remove('pending');
       text.textContent = partial;
-    });
+    };
+    const out = hybrid
+      ? deviceReady
+        ? await explainHybrid(prompt, onText, { deviceReady })
+        : await withTimeout(explainHybrid(prompt, onText, { deviceReady }), CLOUD_TIMEOUT_MS)
+      : await explainOnDevice(prompt, onText);
     text.classList.remove('pending');
     text.textContent = out.text;
-    setChip($('local-chip'), out.source, out.ms);
-    meta.textContent = 'Gemini Nano, running in Chrome. Written on your computer: nothing was sent to an AI service.';
+    setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
+    meta.textContent =
+      out.source === 'on_device'
+        ? 'Gemini Nano, running in Chrome. Written on your computer: nothing was sent to an AI service.'
+        : 'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
     meta.hidden = false;
+    if (out.source !== 'on_device') showSent(prompt, true);
     document.body.dataset.local = 'done';
+    document.body.dataset.source = out.source;
   } catch (error) {
     text.classList.remove('pending');
     text.classList.add('muted');
-    text.textContent = 'The on-device model could not answer this time. The facts below do not depend on it.';
+    if (hybrid && !deviceReady) {
+      text.textContent = `${cloudProblem(error)} The facts below do not depend on it.`;
+      meta.textContent = isPreview
+        ? 'Cloud AI stays allowed for this visit.'
+        : 'Cloud AI can be turned off in Guardian’s toolbar panel.';
+      meta.hidden = false;
+    } else {
+      text.textContent = 'The on-device model could not answer this time. The facts below do not depend on it.';
+    }
     document.body.dataset.local = 'error';
-    console.warn('[Guardian] on-device explanation failed', error);
+    document.body.dataset.localError = String((error && error.message) || error).slice(0, 300);
+    console.warn('[Guardian] explanation failed', error);
+  } finally {
+    // The cloud stood in (or tried to) for a model this computer can still
+    // download: keep offering it.
+    if (hybrid && canDownload) {
+      $('local-download').textContent = 'Download the on-device model to keep this on your computer';
+      offerDownload(result, host);
+    }
   }
 }
 
@@ -178,16 +284,18 @@ function wireCloud(result, host) {
   const ask = $('cloud-ask');
   if (!cloudReady) {
     ask.hidden = true;
+    $('cloud-sent-box').hidden = true;
     $('cloud-consent').textContent = 'Cloud analysis is not set up in this build. Nothing is sent anywhere.';
     document.body.dataset.cloud = 'off';
     return;
   }
+  $('cloud-sent').textContent = deepPrompt(result, host);
   ask.addEventListener('click', async () => {
     ask.disabled = true;
     ask.textContent = 'Asking Gemini in the cloud…';
     document.body.dataset.cloud = 'pending';
     try {
-      const out = await analyzeInCloud(deepPrompt(result, host));
+      const out = await withTimeout(analyzeInCloud(deepPrompt(result, host)), CLOUD_TIMEOUT_MS);
       $('cloud-summary').textContent = String(out.data.summary || '');
       $('cloud-confirm').textContent = String(out.data.ifYouConfirm || '');
       $('cloud-pattern').textContent = String(out.data.pattern || '');
@@ -201,6 +309,7 @@ function wireCloud(result, host) {
       $('cloud-result').hidden = false;
       setChip($('cloud-chip'), out.source, out.ms);
       ask.hidden = true;
+      $('cloud-sent-box').querySelector('summary').textContent = 'Exactly what was sent';
       $('cloud-consent').textContent = 'Gemini through Firebase AI Logic, at your request.';
       document.body.dataset.cloud = 'done';
     } catch (error) {

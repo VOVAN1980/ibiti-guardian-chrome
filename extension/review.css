@@ -285,6 +285,45 @@ section > h2 {
   display: none;
 }
 
+/* The one-time cloud permission and "exactly what would be sent". */
+
+.fallback {
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+details.sent {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+details.sent summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+details.sent summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+details.sent pre {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  max-height: 180px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── Facts ──────────────────────────────────────────────────────────────── */
 
 .facts {

@@ -3,7 +3,7 @@
 **Know what you sign.** Wallet drainers rarely hack anything: they ask you to
 sign. Guardian holds a wallet request *before your wallet sees it*, decodes it
 into plain facts, lets Gemini explain it — on your device first, in the cloud
-only when you ask — and then you decide.
+only if you allow it — and then you decide.
 
 **Try it now, nothing to install: https://ibiti-guardian-chrome.web.app**
 (a simulation with a demo wallet that has no keys and no funds; the extension
@@ -33,7 +33,9 @@ Built for #BuildHybridAI 2026.
    level — *High risk*, *Check carefully*, *No red flags found* — is decided by
    code, never by a model.
 3. **Gemini explains it, on your device.** Gemini Nano turns the facts into
-   two plain sentences on your own computer. No AI service is contacted.
+   two plain sentences on your own computer. No AI service is contacted. On a
+   computer without Gemini Nano, a one-time permission lets Gemini in the
+   cloud explain instead (Firebase AI Logic's hybrid fallback).
 4. **A deeper look, only if you ask.** One button sends the decoded facts
    (never your own wallet address) to Gemini in the cloud for a structured
    second opinion.
@@ -49,28 +51,41 @@ on ordinary requests.
 
 ## How the hybrid AI is used
 
-Firebase AI Logic hybrid inference, with the path chosen by the user's consent
-rather than by an automatic fallback:
+Firebase AI Logic hybrid inference. The short explanation runs on the
+computer whenever Gemini Nano is there; once the user has allowed the cloud,
+the SDK falls back to Gemini in the cloud on computers without it.
 
-| | On device | In the cloud |
-|---|---|---|
-| Model | Gemini Nano, built into Chrome | Gemini (`gemini-3.5-flash-lite`) |
-| Mode | `InferenceMode.ONLY_ON_DEVICE`, streaming | `InferenceMode.ONLY_IN_CLOUD`, JSON schema |
-| When | By itself, as soon as the window opens | Only after the user presses **Ask cloud AI** |
-| Sent to an AI service | Nothing | The decoded facts; never the user's address |
-| Protected by | — (no network call) | Firebase App Check |
+| | Plain-words explanation | Plain-words explanation, cloud allowed | Deeper analysis |
+|---|---|---|---|
+| Mode | `ONLY_ON_DEVICE`, streaming | `PREFER_ON_DEVICE`, streaming | `ONLY_IN_CLOUD`, JSON schema |
+| Model | Gemini Nano, built into Chrome | Gemini Nano if ready, else `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` |
+| When | By itself (the default) | By itself, after a one-time **Use cloud AI when this computer has none** | Only after the user presses **Ask cloud AI** |
+| Sent to an AI service | Nothing | Nothing when Nano answers; otherwise the decoded facts | The decoded facts |
+| Protected by | — (no network call) | Firebase App Check | Firebase App Check |
 
+- The permission is off until the user turns it on, in Guardian's window or
+  its toolbar panel (where it can be turned off again). The hosted demo keeps
+  it for the visit only.
+- **Exactly what would be sent** shows the full text next to the one-time
+  permission, and **Exactly what was sent** after every cloud answer. It
+  never holds the user's wallet address or balance. (For a payment, the risk
+  level that goes with the facts can still hint that it takes most of the
+  balance: the explanation must not contradict the window.)
 - Each answer shows where it ran and how long it took (*On device · 12.0 s*,
-  *Cloud · 3.8 s*).
+  *Cloud fallback · 1.6 s*, *Cloud · 3.8 s*), from the SDK's
+  `inferenceSource`.
+- The SDK falls back when no on-device model is ready (including one that
+  still needs downloading; the window then also offers the download). If
+  Gemini Nano is there but fails while answering, there is no explanation
+  that time; the facts and the decision never depend on it.
 - Prompts are built only from the analyzer's facts, plus one exact sentence,
   written by code, on who would be allowed to do what — small models tend to
   swap the roles in an approval (`src/ai/prompt.js`).
 - The model explains; it never decides what the request is or how risky it is.
 - No Gemini API key is in the extension. Firebase AI Logic is the gateway
   (`src/ai/engine.js`).
-- If the on-device model is not available, the facts and the decision still
-  work, and the cloud button is there. If it only needs downloading, the
-  window offers a one-time download.
+- If no AI answers at all (no on-device model and no permission for the
+  cloud), the facts and the decision still work.
 
 ## Try it in two minutes
 
@@ -82,8 +97,10 @@ rather than by an automatic fallback:
 3. Press **Turn Guardian off to see the difference** and click again: the
    same request goes straight to the wallet.
 
-On-device explanations need a Chrome that has Gemini Nano (built-in AI). The
-facts, the decision and the cloud analysis do not depend on it.
+On-device explanations need a Chrome that has Gemini Nano (built-in AI).
+Without it, press **Use cloud AI when this computer has none** once, and
+Gemini in the cloud explains instead for the rest of the visit. The facts, the
+decision and the deeper analysis do not depend on either.
 
 <img src="docs/playground.png" alt="The hosted playground" width="640">
 
@@ -100,8 +117,9 @@ unpacked). Requires Chrome 139 or newer.
 
 Guardian needs no clicks: it opens its own window when a page asks the wallet
 to sign or send. The toolbar icon opens a small panel that says Guardian is on,
-whether Gemini Nano and the cloud analysis are available in this build, and
-opens the test page.
+whether Gemini Nano and the cloud analysis are available in this build, holds
+the switch for the cloud fallback (off until you turn it on, here or in
+Guardian's window), and opens the test page.
 
 <img src="docs/popup.png" alt="The toolbar panel" width="300">
 
@@ -142,7 +160,7 @@ node test/cloud-live.mjs                                  # live cloud analysis 
 ## Tests
 
 ```bash
-npm test             # analyzer: decoding and risk rules
+npm test             # analyzer: decoding and risk rules; what prompts may send to the cloud
 npm run test:e2e     # real Chrome: the extension, then the no-install site
 ```
 
@@ -171,15 +189,18 @@ from the wallet; Continue delivered the same request to it.
 - `src/analyzer/` decodes the request without AI.
 - `src/review.js` is the review window; `src/host.js` lets the same window run
   in the extension and in the hosted preview (`src/web/panel.js`).
-- `src/ai/` is the hybrid inference: `engine.js` (the two paths),
+- `src/ai/` is the hybrid inference: `engine.js` (the three modes),
   `prompt.js` (prompts from facts only), `appcheck.*.js` (App Check per build).
 
 ## Privacy
 
-On-device by default. The cloud is contacted only after an explicit click, and
-receives the decoded facts of the request — the site, the action, the token,
-the amount, the other party's address — never the user's own address.
-Guardian has no server of its own and keeps no history.
+On-device by default. The cloud is contacted only after an explicit choice:
+the one-time permission for computers without Gemini Nano (switched off again
+in the toolbar panel; on the hosted demo it lasts for the visit), or the
+**Ask cloud AI** button. It receives the decoded facts of the request — the
+site, the action, the token, the amount, the other party's address — never
+the user's own address or balance. Guardian has no server of its own and keeps
+no history.
 
 To describe a request, Guardian reads public context through your wallet's
 own connection, the way the wallet itself would: whether the other party is a

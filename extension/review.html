@@ -30,6 +30,18 @@
         <p class="ai-text" id="local-text"></p>
         <button class="quiet" id="local-download" type="button" hidden>Download the on-device model (one time)</button>
         <p class="ai-meta" id="local-meta" hidden></p>
+        <div class="fallback" id="local-fallback" hidden>
+          <button class="quiet" id="local-fallback-allow" type="button">Use cloud AI when this computer has none</button>
+          <p class="ai-meta" id="local-fallback-note">
+            Gemini in the cloud then explains instead, through Firebase: now and next time, whenever this computer has
+            no on-device model. Sends the decoded details below, never your wallet address. Turn it off in Guardian’s
+            toolbar panel.
+          </p>
+        </div>
+        <details class="sent" id="local-sent-box" hidden>
+          <summary id="local-sent-label">Exactly what would be sent</summary>
+          <pre id="local-sent"></pre>
+        </details>
       </section>
 
       <dl class="facts" id="facts"></dl>
@@ -63,6 +75,10 @@
           Optional. Sends the decoded details above (site, action, token, amount, the other party’s address) to
           Gemini through Firebase. Your wallet address is not sent.
         </p>
+        <details class="sent" id="cloud-sent-box">
+          <summary>Exactly what would be sent</summary>
+          <pre id="cloud-sent"></pre>
+        </details>
       </section>
     </main>
 

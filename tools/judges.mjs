@@ -49,6 +49,11 @@ Try it (about 1 minute):
   6. Press "Claim airdrop". Guardian's own window opens: the request is held,
      the facts are decoded by code, and Gemini Nano explains it on your device
      (Firebase AI Logic, InferenceMode.ONLY_ON_DEVICE).
+     No Gemini Nano in your Chrome? Press "Use cloud AI when this computer has
+     none" once: from then on the explanation uses InferenceMode.PREFER_ON_DEVICE
+     and the SDK falls back to Gemini in the cloud by itself (chip "Cloud
+     fallback"). "Exactly what was sent" shows the text; the toolbar panel
+     turns it off again.
   7. Press "Ask cloud AI": Gemini in the cloud (InferenceMode.ONLY_IN_CLOUD,
      App Check with the judges' debug token in this build) names the scam
      pattern and what to check.
@@ -58,7 +63,7 @@ Try it (about 1 minute):
 Gemini Nano: if Chrome has not downloaded the on-device model yet, Guardian's
 window offers a one-time download (a few GB, needs a capable GPU or CPU; see
 https://developer.chrome.com/docs/ai/get-started). Everything else works
-without it, and the cloud analysis works either way.
+without it: the facts, the decision, the cloud fallback and the cloud analysis.
 
 Please keep this build to the judging: it carries an App Check debug token
 for our free Firebase project. Source: https://github.com/VOVAN1980/ibiti-guardian-chrome

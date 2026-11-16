@@ -207,6 +207,147 @@ await step('cloud analysis runs only after the user asks for it', async () => {
   }
 });
 
+// Opens a scenario's review window and records every request it makes outside
+// the extension.
+async function reviewWithCalls(scenario) {
+  const before = new Set(browser.targets());
+  await page.click(`[data-scenario="${scenario}"]`);
+  const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
+  const review = await target.asPage();
+  const calls = [];
+  const bodies = [];
+  review.on('request', (request) => {
+    const url = request.url();
+    if (url.startsWith('chrome-extension://')) return;
+    calls.push(url);
+    if (/generatecontent/i.test(url)) bodies.push(request.postData() || '');
+  });
+  await review.waitForFunction(() => document.getElementById('badge').textContent !== '');
+  return { review, calls, bodies };
+}
+
+/** The prompt text inside a Gemini request body. */
+const promptOf = (body) => {
+  try {
+    return JSON.parse(body).contents[0].parts[0].text;
+  } catch {
+    return '';
+  }
+};
+
+async function rejectAndWait(review) {
+  await review.click('#reject');
+  expectedHistory += 1;
+  await waitForHistory(expectedHistory);
+}
+
+await step('hybrid: once allowed, a computer without Gemini Nano gets the explanation from the cloud by itself', async () => {
+  // Before the user allows it: offered, with the exact text that would be sent.
+  const first = await reviewWithCalls('claim');
+  try {
+    await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
+    const offer = await first.review.evaluate(() => ({
+      local: document.body.dataset.local,
+      fallback: document.body.dataset.fallback,
+      shown: !document.getElementById('local-fallback').hidden,
+      sent: document.getElementById('local-sent').textContent,
+    }));
+    if (offer.fallback === undefined || !offer.shown) {
+      assert.equal(await first.review.evaluate(() => document.body.dataset.cloud), 'off');
+      console.log('     hybrid: SKIPPED, cloud is not set up in this build');
+      return;
+    }
+    assert.equal(offer.local, 'unavailable');
+    assert.equal(offer.fallback, 'off');
+    assert.match(offer.sent, /Unlimited spending permission for USDT/);
+    const user = await page.evaluate(() => window.ethereum.request({ method: 'eth_accounts' }));
+    assert.ok(user.length > 0 && !offer.sent.toLowerCase().includes(user[0].toLowerCase()), 'the user’s address is not in it');
+    assert.deepEqual(first.calls, [], 'nothing is sent before the user allows it');
+
+    await first.review.click('#local-fallback-allow');
+    await first.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 40000 });
+    const out = await first.review.evaluate(() => ({
+      local: document.body.dataset.local,
+      source: document.body.dataset.source,
+      chip: document.getElementById('local-chip').textContent,
+      text: document.getElementById('local-text').textContent,
+      meta: document.getElementById('local-meta').textContent,
+    }));
+    assert.equal(out.local, 'done', 'the explanation arrived');
+    assert.equal(out.source, 'in_cloud', 'the SDK fell back to the cloud');
+    assert.match(out.chip, /^Cloud fallback · \d/);
+    assert.ok(out.text.length > 20, 'an explanation is shown');
+    assert.match(out.meta, /as you allowed/);
+    assert.ok(first.calls.some((url) => url.includes('googleapis.com')), 'answered through Firebase');
+    // What was shown is exactly what went out, and the window says so.
+    assert.equal(first.bodies.length, 1, 'one cloud call for the explanation');
+    assert.equal(promptOf(first.bodies[0]), offer.sent);
+    const after = await first.review.evaluate(() => ({
+      label: document.getElementById('local-sent-label').textContent,
+      sent: document.getElementById('local-sent').textContent,
+      shown: !document.getElementById('local-sent-box').hidden,
+    }));
+    assert.deepEqual(after, { label: 'Exactly what was sent', sent: offer.sent, shown: true });
+    console.log(`     hybrid: ${out.chip} | ${out.text.slice(0, 90)}`);
+  } finally {
+    await rejectAndWait(first.review);
+  }
+
+  // The next request: no click, the explanation comes by itself.
+  const second = await reviewWithCalls('permit');
+  try {
+    await second.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 40000 });
+    const out = await second.review.evaluate(() => ({
+      local: document.body.dataset.local,
+      fallback: document.body.dataset.fallback,
+      offered: !document.getElementById('local-fallback').hidden,
+      chip: document.getElementById('local-chip').textContent,
+    }));
+    assert.equal(out.fallback, 'on');
+    assert.equal(out.offered, false, 'not asked again');
+    assert.equal(out.local, 'done');
+    assert.match(out.chip, /^Cloud fallback · \d/);
+  } finally {
+    await rejectAndWait(second.review);
+  }
+});
+
+await step('hybrid: the toolbar panel turns the cloud fallback off again', async () => {
+  const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
+  const panel = await browser.newPage();
+  try {
+    await panel.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`, { waitUntil: 'load' });
+    await panel.waitForFunction(() => !/Checking/.test(document.getElementById('fallback-text').textContent));
+    const state = await panel.evaluate(() => ({
+      disabled: document.getElementById('fallback').disabled,
+      checked: document.getElementById('fallback').checked,
+    }));
+    if (state.disabled) {
+      console.log('     hybrid off: SKIPPED, cloud is not set up in this build');
+      return;
+    }
+    assert.equal(state.checked, true, 'on, as allowed in the window');
+    await panel.click('#fallback');
+    await panel.waitForFunction(() => /^Off/.test(document.getElementById('fallback-text').textContent));
+  } finally {
+    await panel.close();
+  }
+
+  const next = await reviewWithCalls('claim');
+  try {
+    await next.review.waitForFunction(() => document.body.dataset.local !== undefined);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const out = await next.review.evaluate(() => ({
+      fallback: document.body.dataset.fallback,
+      offered: !document.getElementById('local-fallback').hidden,
+    }));
+    assert.deepEqual(out, { fallback: 'off', offered: true });
+    assert.deepEqual(next.calls, [], 'nothing is sent once it is off');
+  } finally {
+    await rejectAndWait(next.review);
+  }
+});
+
 await step('the toolbar panel says Guardian is on, what this build can do, and opens the test page', async () => {
   const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
   const id = new URL(worker.url()).host;

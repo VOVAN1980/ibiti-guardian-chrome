@@ -33,3 +33,33 @@ export async function sendDecision(id, decision) {
 export function closeReview() {
   if (inExtension) window.close();
 }
+
+// The user's one-time permission to use Gemini in the cloud when this
+// computer has no on-device model. Off until the user turns it on. The
+// extension keeps it (chrome.storage.local, which pages cannot reach); the
+// hosted preview keeps it for this visit only.
+const FALLBACK_KEY = 'cloudFallback';
+
+export async function cloudFallbackAllowed() {
+  if (inExtension) {
+    const stored = await chrome.storage.local.get(FALLBACK_KEY);
+    return stored[FALLBACK_KEY] === true;
+  }
+  try {
+    return sessionStorage.getItem(`guardian:${FALLBACK_KEY}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export async function allowCloudFallback() {
+  if (inExtension) {
+    await chrome.storage.local.set({ [FALLBACK_KEY]: true });
+    return;
+  }
+  try {
+    sessionStorage.setItem(`guardian:${FALLBACK_KEY}`, '1');
+  } catch {
+    // this visit only; nothing to keep
+  }
+}

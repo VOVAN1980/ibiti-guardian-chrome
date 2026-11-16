@@ -243,6 +243,8 @@ function nativeTransfer(to, value, chain, ctx) {
       ...judged.reasons,
       'This sends coins straight to the address above. A confirmed transfer cannot be undone.',
     ],
+    // Reasons that come from the user's balance; kept out of cloud prompts.
+    balanceReasons: judged.reasons,
     subject: { action: 'nativeTransfer', to, amount, shareOfBalance: judged.note },
   };
 }
@@ -424,6 +426,7 @@ function tokenTransfer({ token, from, recipient, amount, ctx }) {
       ...judged.reasons,
       'This moves tokens to the address above. A confirmed transfer cannot be undone.',
     ],
+    balanceReasons: judged.reasons,
     subject: { action: 'transfer', token: tok, to: recipient, amount: amt.text, shareOfBalance: judged.note },
   };
 }

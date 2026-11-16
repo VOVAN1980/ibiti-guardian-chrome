@@ -117,6 +117,25 @@ main {
   color: var(--text-2);
 }
 
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.switch input:disabled {
+  cursor: default;
+}
+
 .primary {
   width: 100%;
   padding: 10px;
