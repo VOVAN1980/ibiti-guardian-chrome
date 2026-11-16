@@ -52,6 +52,29 @@ export async function cloudFallbackAllowed() {
   }
 }
 
+/**
+ * Calls `callback` when the user turns the permission off (in the toolbar
+ * panel) while this window is open. Returns a function that stops listening.
+ */
+export function onCloudFallbackOff(callback) {
+  if (!inExtension) return () => {};
+  const listener = (changes, area) => {
+    if (area === 'local' && changes[FALLBACK_KEY] && changes[FALLBACK_KEY].newValue !== true) callback();
+  };
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
+}
+
+/** The last explanation's timings and source, for the toolbar panel. */
+export async function saveLastExplanation(stats) {
+  if (!inExtension) return;
+  try {
+    await chrome.storage.local.set({ lastExplanation: { ...stats, at: Date.now() } });
+  } catch {
+    // only a display aid
+  }
+}
+
 export async function allowCloudFallback() {
   if (inExtension) {
     await chrome.storage.local.set({ [FALLBACK_KEY]: true });

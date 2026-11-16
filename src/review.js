@@ -13,8 +13,18 @@ import {
   explainHybrid,
   explainOnDevice,
 } from './ai/engine.js';
-import { deepPrompt, explainPrompt } from './ai/prompt.js';
-import { allowCloudFallback, closeReview, cloudFallbackAllowed, isPreview, loadReview, sendDecision } from './host.js';
+import { answerChecker, codeSentence, isUndecoded, ownAddresses, scrubAddresses, scrubResult } from './ai/guard.js';
+import { deepPrompt, explainPrompt, meaning } from './ai/prompt.js';
+import {
+  allowCloudFallback,
+  closeReview,
+  cloudFallbackAllowed,
+  isPreview,
+  loadReview,
+  onCloudFallbackOff,
+  saveLastExplanation,
+  sendDecision,
+} from './host.js';
 
 const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'No red flags found' };
 const $ = (id) => document.getElementById(id);
@@ -22,6 +32,9 @@ const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
 const id = new URLSearchParams(location.search).get('id');
 let decided = false;
+// The user's own address(es) in this request: removed from anything that may
+// be sent to the cloud.
+let own = [];
 
 async function decide(decision) {
   if (decided) return;
@@ -145,6 +158,21 @@ function offerDownload(result, host) {
   };
 }
 
+/**
+ * The explanation prompt as it may go to the cloud: no balance, no own
+ * address (taken out of every value before any value is shortened, and again
+ * from the finished text).
+ */
+const cloudExplainPrompt = (result, host) =>
+  scrubAddresses(explainPrompt(scrubResult(result, own), host, { cloud: true }), own);
+
+/** The network of the request under review (for the coin it pays gas in). */
+let chainId = null;
+
+// When the user pressed "Ask cloud AI" (performance.now() time): requests
+// from then on are the deeper analysis, not the explanation.
+let deepAskedAt = Infinity;
+
 /** Shows the exact text that would be (or was) sent to the cloud. */
 function showSent(prompt, sent) {
   $('local-sent').textContent = prompt;
@@ -160,7 +188,7 @@ function offerFallback(result, host) {
       'Gemini in the cloud then explains instead, through Firebase, for the rest of this visit whenever this browser ' +
       'has no on-device model. Sends the decoded details below, never your wallet address.';
   }
-  showSent(explainPrompt(result, host, { cloud: true }), false);
+  showSent(cloudExplainPrompt(result, host), false);
   $('local-fallback').hidden = false;
   const allow = $('local-fallback-allow');
   allow.onclick = async () => {
@@ -176,25 +204,56 @@ function offerFallback(result, host) {
 // privacy tool or a network filter) must not leave the window waiting.
 const CLOUD_TIMEOUT_MS = 30000;
 
-function withTimeout(promise, ms) {
+/**
+ * Waits for `promise` at most `ms`. On time-out it also calls `onTimeout`,
+ * which aborts the request: a late answer must not appear after the window
+ * has said there was none, and nothing may be sent after that either.
+ */
+function withTimeout(promise, ms, onTimeout) {
   let timer;
   return Promise.race([
     promise,
     new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`no answer within ${ms / 1000} s`)), ms);
+      timer = setTimeout(() => {
+        const error = new Error(`no answer within ${ms / 1000} s`);
+        error.name = 'TimeoutError';
+        if (onTimeout) onTimeout(error);
+        reject(error);
+      }, ms);
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Requests this window made to other sites between `since` and `until`
+ * (performance.now() times), leaving out the deeper analysis the user asked
+ * for: the evidence behind "nothing was sent" for an on-device answer.
+ */
+function cloudRequestsBetween(since, until) {
+  return performance
+    .getEntriesByType('resource')
+    .filter(
+      (e) =>
+        e.startTime >= since &&
+        e.startTime <= until &&
+        e.startTime < deepAskedAt &&
+        !e.name.startsWith(location.origin) &&
+        !/^(chrome-extension|data|blob):/.test(e.name),
+    ).length;
 }
 
 /** Why a cloud call failed, in words the user can act on. */
 function cloudProblem(error) {
   const message = String((error && error.message) || error);
+  if (error && error.name === 'TimeoutError') return 'The cloud did not answer within 30 seconds.';
   if (/free tier is not available|billing/i.test(message)) {
     return 'Cloud AI is not switched on for this Firebase project yet.';
   }
   if (/quota|429|resource.exhausted/i.test(message)) return 'The cloud AI is busy right now (usage limit).';
   return 'The cloud could not be reached.';
 }
+
+const CHECKED = 'its addresses, amounts and token names were checked against the request';
 
 async function runLocal(result, host) {
   const text = $('local-text');
@@ -212,6 +271,18 @@ async function runLocal(result, host) {
   meta.hidden = true;
   delete document.body.dataset.source;
 
+  // Nothing decoded, nothing to explain: a model could only guess what the
+  // request does. Guardian says so itself, and no AI is asked.
+  if (isUndecoded(result)) {
+    text.classList.remove('pending');
+    text.textContent = codeSentence(result, meaning(result, host));
+    meta.textContent =
+      'Guardian could not decode this request, so no AI explains it: an explanation could only be a guess. Written by Guardian.';
+    meta.hidden = false;
+    document.body.dataset.local = 'undecoded';
+    return;
+  }
+
   if (!deviceReady && !hybrid) {
     text.classList.remove('pending');
     if (canDownload) {
@@ -228,47 +299,123 @@ async function runLocal(result, host) {
   $('local-fallback').hidden = true;
   text.classList.remove('muted');
   text.classList.add('pending');
-  text.textContent = deviceReady ? 'Explaining on this computer' : 'Explaining';
-  // With Gemini Nano ready the hybrid call cannot reach the cloud (no App
-  // Check on that app), so the prompt may keep what stays on this computer.
-  const prompt = explainPrompt(result, host, { cloud: hybrid && !deviceReady });
-  try {
-    const onText = (partial) => {
-      text.classList.remove('pending');
-      text.textContent = partial;
-    };
-    const out = hybrid
-      ? deviceReady
-        ? await explainHybrid(prompt, onText, { deviceReady })
-        : await withTimeout(explainHybrid(prompt, onText, { deviceReady }), CLOUD_TIMEOUT_MS)
-      : await explainOnDevice(prompt, onText);
+  text.textContent = deviceReady
+    ? 'Gemini Nano is writing on this computer. Each sentence appears once its addresses, amounts and token names have been checked against the request.'
+    : 'Gemini is writing in the cloud. Each sentence appears once its addresses, amounts and token names have been checked against the request.';
+
+  const toCloud = hybrid && !deviceReady;
+  // With the permission on, the SDK decides where the answer is written, and
+  // it decides again at the moment of the call: Gemini Nano that was ready a
+  // moment ago may be gone. So whatever is handed to the hybrid mode is
+  // already the text that may go to the cloud: no own address, no balance.
+  const prompt = hybrid ? cloudExplainPrompt(result, host) : explainPrompt(result, host);
+  const sentence = meaning(result, host);
+  const checker = answerChecker(result, sentence, { own, chainId });
+  const started = performance.now();
+  let shownMs = null;
+  // Once this run has ended (answered, failed or timed out), nothing more
+  // from it may reach the screen.
+  let over = false;
+  const show = ({ shown }) => {
+    if (over || !shown) return;
+    if (shownMs === null) shownMs = Math.round(performance.now() - started);
     text.classList.remove('pending');
-    text.textContent = out.text;
+    text.textContent = shown;
+  };
+
+  // Turning the permission off stops a cloud request that has not gone out,
+  // on either path of the hybrid mode; so does the time-out.
+  const stop = new AbortController();
+  const stopListening = hybrid ? onCloudFallbackOff(() => stop.abort(new Error('cloud turned off'))) : () => {};
+  let run = null;
+  try {
+    // Reading stops at the first sentence that fails: the rest is not wanted.
+    const onText = (partial) => {
+      if (over) return false;
+      const state = checker.push(partial);
+      show(state);
+      return state.problem === null;
+    };
+    const ask = () => explainHybrid(prompt, onText, { deviceReady, signal: stop.signal });
+    run = hybrid ? ask() : explainOnDevice(prompt, onText);
+    const out = toCloud ? await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e)) : await run;
+    over = true;
+    const verdict = checker.finish(out.text);
+    text.classList.remove('pending');
     setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
-    meta.textContent =
+    const requests = cloudRequestsBetween(started, performance.now());
+    const where =
       out.source === 'on_device'
-        ? 'Gemini Nano, running in Chrome. Written on your computer: nothing was sent to an AI service.'
+        ? `Gemini Nano, running in Chrome. Written on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`
         : 'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
+    if (verdict.problem && verdict.shown) {
+      // The answer stopped at a sentence that failed; what is on screen passed.
+      text.textContent = verdict.shown;
+      meta.textContent = `${where} Gemini's answer was cut short: its next sentence had ${verdict.problem}.`;
+      document.body.dataset.checked = 'cut';
+    } else if (verdict.problem) {
+      // Nothing passed: what the user reads is written by code from the facts.
+      text.textContent = codeSentence(result, sentence);
+      meta.textContent =
+        verdict.problem === 'nothing'
+          ? 'Gemini gave no usable answer, so this sentence is written by Guardian from the facts.'
+          : `Gemini's answer was not shown: it had ${verdict.problem}. This sentence is written by Guardian from the facts.`;
+      document.body.dataset.checked = 'withheld';
+    } else {
+      text.textContent = verdict.shown;
+      meta.textContent = `${where} Before it was shown, ${CHECKED}.`;
+      document.body.dataset.checked = 'passed';
+    }
+    if (verdict.problem) {
+      document.body.dataset.withheld = verdict.problem;
+      document.body.dataset.withheldDetail = verdict.detail || ''; // tests and logs only
+    }
     meta.hidden = false;
     if (out.source !== 'on_device') showSent(prompt, true);
-    document.body.dataset.local = 'done';
-    document.body.dataset.source = out.source;
+    $('local-chip').title =
+      `First words after ${seconds(out.firstMs ?? out.ms)}; checked text shown after ${seconds(shownMs ?? out.ms)}; ` +
+      `finished after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
+    Object.assign(document.body.dataset, {
+      local: 'done',
+      source: out.source,
+      firstMs: String(out.firstMs ?? ''),
+      shownMs: String(shownMs ?? ''),
+      ms: String(out.ms),
+      requests: String(requests),
+    });
+    saveLastExplanation({
+      source: out.source,
+      firstMs: out.firstMs,
+      shownMs,
+      ms: out.ms,
+      requests,
+      checked: document.body.dataset.checked,
+    });
   } catch (error) {
+    over = true;
+    if (run) run.catch(() => {}); // a late failure after the time-out
     text.classList.remove('pending');
     text.classList.add('muted');
-    if (hybrid && !deviceReady) {
+    const message = String((error && error.message) || error);
+    const turnedOff = stop.signal.aborted && /turned off/i.test(String(stop.signal.reason && stop.signal.reason.message));
+    if (turnedOff) {
+      text.textContent = 'Cloud AI was turned off, so the explanation was stopped. The facts below do not depend on it.';
+      document.body.dataset.stopped = 'turned-off';
+    } else if (toCloud) {
       text.textContent = `${cloudProblem(error)} The facts below do not depend on it.`;
       meta.textContent = isPreview
         ? 'Cloud AI stays allowed for this visit.'
         : 'Cloud AI can be turned off in Guardian’s toolbar panel.';
       meta.hidden = false;
     } else {
-      text.textContent = 'The on-device model could not answer this time. The facts below do not depend on it.';
+      text.textContent = 'The AI could not answer this time. The facts below do not depend on it.';
     }
     document.body.dataset.local = 'error';
-    document.body.dataset.localError = String((error && error.message) || error).slice(0, 300);
+    document.body.dataset.localError = message.slice(0, 300);
+    saveLastExplanation({ source: toCloud ? 'in_cloud' : 'unknown', error: turnedOff ? 'turned off' : cloudProblem(error) });
     console.warn('[Guardian] explanation failed', error);
   } finally {
+    stopListening();
     // The cloud stood in (or tried to) for a model this computer can still
     // download: keep offering it.
     if (hybrid && canDownload) {
@@ -289,36 +436,87 @@ function wireCloud(result, host) {
     document.body.dataset.cloud = 'off';
     return;
   }
-  $('cloud-sent').textContent = deepPrompt(result, host);
+  // Nothing decoded: nothing for an analysis to work from but guesses.
+  if (isUndecoded(result)) {
+    ask.hidden = true;
+    $('cloud-sent-box').hidden = true;
+    $('cloud-consent').textContent =
+      'Guardian could not decode this request, so there is nothing for an AI analysis to work from. Nothing is sent.';
+    document.body.dataset.cloud = 'undecoded';
+    return;
+  }
+  const prompt = scrubAddresses(deepPrompt(scrubResult(result, own), host), own);
+  $('cloud-sent').textContent = prompt;
   ask.addEventListener('click', async () => {
     ask.disabled = true;
     ask.textContent = 'Asking Gemini in the cloud…';
     document.body.dataset.cloud = 'pending';
+    deepAskedAt = Math.min(deepAskedAt, performance.now());
+    const stop = new AbortController();
     try {
-      const out = await withTimeout(analyzeInCloud(deepPrompt(result, host)), CLOUD_TIMEOUT_MS);
-      $('cloud-summary').textContent = String(out.data.summary || '');
-      $('cloud-confirm').textContent = String(out.data.ifYouConfirm || '');
-      $('cloud-pattern').textContent = String(out.data.pattern || '');
-      $('cloud-checks').replaceChildren(
-        ...(Array.isArray(out.data.checks) ? out.data.checks : []).slice(0, 4).map((item) => {
-          const li = document.createElement('li');
-          li.textContent = String(item);
-          return li;
-        }),
-      );
+      const out = await withTimeout(analyzeInCloud(prompt, { signal: stop.signal }), CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
+      const data = out.data || {};
+      const summary = String(data.summary || '');
+      const confirm = String(data.ifYouConfirm || '');
+      // A list number the model puts in front ("1. Verify …") is not part of the advice.
+      const checks = (Array.isArray(data.checks) ? data.checks : [])
+        .slice(0, 4)
+        .map((item) => String(item).replace(/^\s*\d{1,2}[.)]\s+/, ''));
+      const name = String(data.patternName || '');
+      // Every piece is checked against the facts before anything is shown.
+      const truthExtra = meaning(result, host);
+      const failed = [summary, confirm, name, ...checks]
+        .map((piece) => answerChecker(result, truthExtra, { own, chainId }).finish(piece))
+        .find((v) => v.problem && v.problem !== 'nothing');
+      const problem = failed ? failed.problem : null;
+      // For tests and logs only; the window never repeats it.
+      if (failed) document.body.dataset.cloudWithheldDetail = failed.detail;
+      const passed = !problem && summary.trim() !== '';
+      if (passed) {
+        $('cloud-summary').textContent = summary;
+        $('cloud-confirm').textContent = confirm;
+        $('cloud-checks').replaceChildren(
+          ...checks.map((item) => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            return li;
+          }),
+        );
+        document.body.dataset.cloudChecked = 'passed';
+      } else {
+        $('cloud-summary').textContent = codeSentence(result, truthExtra);
+        $('cloud-confirm').textContent = problem
+          ? `Gemini's analysis was not shown: it had ${problem}. This sentence is written by Guardian from the facts.`
+          : 'Gemini gave no usable analysis, so this sentence is written by Guardian from the facts.';
+        $('cloud-checks').replaceChildren();
+        document.body.dataset.cloudChecked = 'withheld';
+        document.body.dataset.cloudWithheld = problem || 'nothing';
+      }
+      // The scam-pattern label. The risk is Guardian's, decided by code: the
+      // label is shown only from an answer that passed, and a "known scam"
+      // label never on a request Guardian found no red flags in.
+      let pattern = '';
+      const kind = String(data.patternKind || 'cannot_determine');
+      if (passed) {
+        if (kind === 'known_scam_pattern' && result.risk !== 'info') pattern = name || 'Matches a known scam pattern';
+        else if (kind === 'no_known_pattern') pattern = 'No known scam pattern matched. That alone does not make it safe';
+        else if (kind === 'cannot_determine') pattern = 'Could not determine what this does';
+      }
+      $('cloud-pattern').textContent = pattern;
+      document.body.dataset.patternKind = passed ? kind : 'withheld';
       $('cloud-result').hidden = false;
       setChip($('cloud-chip'), out.source, out.ms);
       ask.hidden = true;
       $('cloud-sent-box').querySelector('summary').textContent = 'Exactly what was sent';
-      $('cloud-consent').textContent = 'Gemini through Firebase AI Logic, at your request.';
+      $('cloud-consent').textContent = passed
+        ? `Gemini through Firebase AI Logic, at your request. Before it was shown, ${CHECKED}.`
+        : 'Gemini through Firebase AI Logic, at your request. Its answer did not pass Guardian’s checks.';
       document.body.dataset.cloud = 'done';
     } catch (error) {
       const message = String((error && error.message) || error);
       ask.disabled = false;
       ask.textContent = 'Cloud analysis failed. Try again';
-      $('cloud-consent').textContent = /free tier is not available|billing/i.test(message)
-        ? 'Cloud AI is not switched on for this Firebase project yet. Nothing was analyzed in the cloud.'
-        : 'The cloud could not be reached. Nothing was analyzed in the cloud.';
+      $('cloud-consent').textContent = `${cloudProblem(error)} Nothing was analyzed in the cloud.`;
       document.body.dataset.cloud = 'error';
       document.body.dataset.cloudError = message.slice(0, 300);
       console.warn('[Guardian] cloud analysis failed', error);
@@ -341,6 +539,8 @@ async function main() {
 
   const result = analyze(record);
   const host = hostOf(record.origin);
+  own = ownAddresses(record);
+  chainId = typeof record.chainId === 'number' ? record.chainId : null;
   render(record, result);
 
   $('reject').addEventListener('click', () => decide('reject'));

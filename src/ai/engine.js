@@ -61,27 +61,53 @@ export async function downloadDeviceModel(onProgress) {
 }
 
 /**
+ * Reads a streamed answer. `onText` gets the whole text so far (the window
+ * checks it before showing anything) and returns false to stop reading: once
+ * a sentence fails the checks, the rest is not wanted. `firstMs` is when the
+ * first words came.
+ */
+async function readStream(model, prompt, onText, options) {
+  const started = performance.now();
+  const result = await model.generateContentStream(prompt, options);
+  let text = '';
+  let firstMs = null;
+  let source = null;
+  let stopped = false;
+  for await (const chunk of result.stream) {
+    // Where the SDK actually ran it, as the SDK reports it on every chunk.
+    source = source || chunk.inferenceSource || null;
+    text += chunk.text();
+    if (firstMs === null && text.trim()) firstMs = Math.round(performance.now() - started);
+    if (onText(text) === false) {
+      stopped = true;
+      break;
+    }
+  }
+  if (stopped) {
+    result.response.catch(() => {}); // the rest is not read
+  } else {
+    const response = await result.response;
+    source = response.inferenceSource || source;
+  }
+  return {
+    text: text.trim(),
+    firstMs,
+    ms: Math.round(performance.now() - started),
+    source: source || 'unknown',
+    stopped,
+  };
+}
+
+/**
  * Streams a short explanation from the on-device model.
- * @returns {{text: string, ms: number, source: string}}
+ * @returns {{text: string, firstMs: number, ms: number, source: string}}
  */
 export async function explainOnDevice(prompt, onText) {
   const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
     onDeviceParams: ON_DEVICE_PARAMS,
   });
-  const started = performance.now();
-  const result = await model.generateContentStream(prompt);
-  let text = '';
-  for await (const chunk of result.stream) {
-    text += chunk.text();
-    onText(text);
-  }
-  const response = await result.response;
-  return {
-    text: text.trim(),
-    ms: Math.round(performance.now() - started),
-    source: response.inferenceSource || 'on_device',
-  };
+  return readStream(model, prompt, onText);
 }
 
 /**
@@ -89,48 +115,48 @@ export async function explainOnDevice(prompt, onText) {
  * it is ready on this computer, otherwise Gemini in the cloud. Call only after
  * the user has allowed the cloud.
  *
+ * The SDK decides where to run at the moment of the call. So `prompt` must
+ * always be the text that may go to the cloud (no own address, no balance),
+ * even when Gemini Nano looked ready a moment ago.
+ *
  * `deviceReady` is Chrome's answer just before the call. When Gemini Nano is
  * ready, the model is built on the app without App Check: the SDK answers on
  * the device, and nothing (not even reCAPTCHA on the hosted demo) is loaded.
- * Should the model vanish in between, the cloud call then fails for lack of
- * App Check instead of going out unannounced.
- * @returns {{text: string, ms: number, source: string}}
+ * Should the model vanish in between, the SDK turns to the cloud, as the
+ * user allowed; Firebase then refuses that request for lack of App Check,
+ * but the (cloud-safe) prompt has been sent.
+ *
+ * `signal` stops a cloud request that has not gone out yet (the user turned
+ * the permission off): the SDK checks it right before sending.
+ * @returns {{text: string, firstMs: number, ms: number, source: string}}
  */
-export async function explainHybrid(prompt, onText, { deviceReady = false } = {}) {
+export async function explainHybrid(prompt, onText, { deviceReady = false, signal } = {}) {
   const model = getGenerativeModel(deviceReady ? onDevice() : inCloud(), {
     mode: InferenceMode.PREFER_ON_DEVICE,
     onDeviceParams: ON_DEVICE_PARAMS,
     inCloudParams: { model: CLOUD_MODEL, generationConfig: { temperature: 0.2 } },
   });
-  const started = performance.now();
-  const result = await model.generateContentStream(prompt);
-  let text = '';
-  for await (const chunk of result.stream) {
-    text += chunk.text();
-    onText(text);
-  }
-  const response = await result.response;
-  return {
-    text: text.trim(),
-    ms: Math.round(performance.now() - started),
-    source: response.inferenceSource || 'unknown',
-  };
+  return readStream(model, prompt, onText, signal ? { signal } : undefined);
 }
+
+const PATTERN_KINDS = ['known_scam_pattern', 'no_known_pattern', 'cannot_determine'];
 
 const DEEP_SCHEMA = Schema.object({
   properties: {
     summary: Schema.string(),
     ifYouConfirm: Schema.string(),
-    pattern: Schema.string(),
+    patternKind: Schema.enumString({ enum: PATTERN_KINDS }),
+    patternName: Schema.string(),
     checks: Schema.array({ items: Schema.string() }),
   },
+  optionalProperties: ['patternName'],
 });
 
 /**
  * Deeper, structured analysis from the cloud model. Call only after consent.
  * @returns {{data: object, ms: number, source: string}}
  */
-export async function analyzeInCloud(prompt) {
+export async function analyzeInCloud(prompt, { signal } = {}) {
   const model = getGenerativeModel(inCloud(), {
     mode: InferenceMode.ONLY_IN_CLOUD,
     inCloudParams: {
@@ -143,7 +169,7 @@ export async function analyzeInCloud(prompt) {
     },
   });
   const started = performance.now();
-  const result = await model.generateContent(prompt);
+  const result = await model.generateContent(prompt, signal ? { signal } : undefined);
   const data = JSON.parse(result.response.text());
   return {
     data,

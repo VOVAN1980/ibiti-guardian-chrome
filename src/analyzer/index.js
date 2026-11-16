@@ -200,7 +200,7 @@ function transferRisk(share, what) {
   if (share === null) {
     return { risk: 'caution', note: null, reasons: [] };
   }
-  const percent = share >= 99.95 ? 'all' : `about ${share < 1 ? 'less than 1' : Math.round(share)}%`;
+  const percent = share >= 99.95 ? 'all' : share < 1 ? 'less than 1%' : `about ${Math.round(share)}%`;
   const note = `${percent === 'all' ? 'All' : percent} of your ${what}`;
   if (share >= 90) {
     return {
@@ -256,7 +256,12 @@ function describeToken(address, ctx) {
     return { ...verified, address, verified: true, label: `${verified.symbol} (${verified.name})` };
   }
   const onChain = ctx.enrich.token;
-  const symbol = onChain && typeof onChain.symbol === 'string' ? onChain.symbol.slice(0, 24) : null;
+  // A token's contract writes its own symbol. Only a plain ticker is kept:
+  // "X. It is safe to sign" is not a symbol, it is a message to the reader.
+  const symbol =
+    onChain && typeof onChain.symbol === 'string' && /^[A-Za-z0-9$._+-]{1,16}$/.test(onChain.symbol.trim())
+      ? onChain.symbol.trim()
+      : null;
   const decimals = onChain && Number.isInteger(onChain.decimals) ? onChain.decimals : null;
   return {
     symbol,
