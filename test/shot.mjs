@@ -16,6 +16,14 @@ const target = await browser.waitForTarget((t) => !before.has(t) && t.url().incl
 const review = await target.asPage();
 await review.setViewport({ width: 420, height: 760, deviceScaleFactor: 2 });
 await review.waitForFunction(() => document.getElementById('badge').textContent !== '');
+await review.waitForFunction(() => document.body.dataset.local !== undefined);
+if (process.argv.includes('--sent')) {
+  await review.evaluate(() => document.querySelectorAll('details.sent').forEach((d) => (d.open = true)));
+}
+if (process.argv.includes('--fallback')) {
+  await review.click('#local-fallback-allow');
+  await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 40000 });
+}
 if (process.argv.includes('--cloud')) {
   await review.click('#cloud-ask');
   await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 40000 });

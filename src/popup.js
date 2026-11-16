@@ -37,3 +37,22 @@ if (!aiBuilt) {
 
 if (aiBuilt && cloudReady) show('cloud', 'Set up: a button in Guardian’s window', 'ok');
 else show('cloud', 'Not set up in this build', 'off');
+
+// The one-time permission for the hybrid fallback (same key as host.js).
+const fallback = $('fallback');
+const fallbackText = (on) => {
+  $('fallback-text').textContent = on ? 'On: Gemini in the cloud explains instead' : 'Off: only Gemini Nano explains';
+  $('fallback-text').className = on ? 'ok' : 'off';
+};
+if (aiBuilt && cloudReady) {
+  const { cloudFallback } = await chrome.storage.local.get('cloudFallback');
+  fallback.checked = cloudFallback === true;
+  fallback.disabled = false;
+  fallbackText(fallback.checked);
+  fallback.addEventListener('change', async () => {
+    await chrome.storage.local.set({ cloudFallback: fallback.checked });
+    fallbackText(fallback.checked);
+  });
+} else {
+  show('fallback-text', 'Not set up in this build', 'off');
+}

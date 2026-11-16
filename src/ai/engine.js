@@ -1,11 +1,18 @@
 // Firebase AI Logic hybrid inference.
 //
-// Two paths, chosen by the user's consent rather than by an automatic fallback:
-//   on device  InferenceMode.ONLY_ON_DEVICE  Gemini Nano in Chrome; no network
-//   in cloud   InferenceMode.ONLY_IN_CLOUD   Gemini through Firebase, only
-//                                            after the user asks for it
-// There is no automatic fallback from device to cloud: the cloud is only ever
-// used after the user presses the button.
+// The short explanation in Guardian's window:
+//   InferenceMode.ONLY_ON_DEVICE    the default. Gemini Nano in Chrome, no
+//                                   network. Without Nano there is no
+//                                   explanation; the facts never need one.
+//   InferenceMode.PREFER_ON_DEVICE  once the user has allowed the cloud. The
+//                                   SDK runs Gemini Nano when it is ready on
+//                                   this computer and falls back to Gemini in
+//                                   the cloud when it is not.
+// The deeper analysis:
+//   InferenceMode.ONLY_IN_CLOUD     only when the user presses its button.
+//
+// The SDK falls back only when no on-device model is ready. If Gemini Nano is
+// there but fails while answering, the explanation is simply missing.
 
 import { initializeApp } from 'firebase/app';
 import { GoogleAIBackend, InferenceMode, Schema, getAI, getGenerativeModel } from 'firebase/ai';
@@ -74,6 +81,39 @@ export async function explainOnDevice(prompt, onText) {
     text: text.trim(),
     ms: Math.round(performance.now() - started),
     source: response.inferenceSource || 'on_device',
+  };
+}
+
+/**
+ * The same short explanation through the SDK's hybrid mode: Gemini Nano when
+ * it is ready on this computer, otherwise Gemini in the cloud. Call only after
+ * the user has allowed the cloud.
+ *
+ * `deviceReady` is Chrome's answer just before the call. When Gemini Nano is
+ * ready, the model is built on the app without App Check: the SDK answers on
+ * the device, and nothing (not even reCAPTCHA on the hosted demo) is loaded.
+ * Should the model vanish in between, the cloud call then fails for lack of
+ * App Check instead of going out unannounced.
+ * @returns {{text: string, ms: number, source: string}}
+ */
+export async function explainHybrid(prompt, onText, { deviceReady = false } = {}) {
+  const model = getGenerativeModel(deviceReady ? onDevice() : inCloud(), {
+    mode: InferenceMode.PREFER_ON_DEVICE,
+    onDeviceParams: ON_DEVICE_PARAMS,
+    inCloudParams: { model: CLOUD_MODEL, generationConfig: { temperature: 0.2 } },
+  });
+  const started = performance.now();
+  const result = await model.generateContentStream(prompt);
+  let text = '';
+  for await (const chunk of result.stream) {
+    text += chunk.text();
+    onText(text);
+  }
+  const response = await result.response;
+  return {
+    text: text.trim(),
+    ms: Math.round(performance.now() - started),
+    source: response.inferenceSource || 'unknown',
   };
 }
 

@@ -2,10 +2,21 @@
 // never decides what the request is or how risky it is, and the user's own
 // wallet address is never part of a prompt.
 
-function factLines(result) {
+// "All of your ETH", "about 40% of your USDT", "This would send all of the ETH
+// in this wallet": how much of the user's balance a payment takes. Useful on
+// this computer; left out of anything that may be sent to the cloud, where it
+// would say how much the user holds. (The risk level still goes with the
+// facts, and for a payment it depends on that share; the window must not
+// disagree with the explanation.)
+const BALANCE_NOTE = / of your /;
+
+function factLines(result, { cloud = false } = {}) {
   return result.facts
     .filter((f) => f.label !== 'From') // may be the user's own address
-    .map((f) => `- ${f.label}: ${f.value}${f.note ? ` (${f.note})` : ''}`)
+    .map((f) => {
+      const note = f.note && !(cloud && BALANCE_NOTE.test(f.note)) ? ` (${f.note})` : '';
+      return `- ${f.label}: ${f.value}${note}`;
+    })
     .join('\n');
 }
 
@@ -14,8 +25,12 @@ function factLines(result) {
 const plainReason = (text) =>
   text.replace(/Guardian does not recognise the (\w+) address\./g, 'The $1 address is unknown.');
 
-function reasonLines(result) {
-  return result.reasons.map((r) => `- ${plainReason(r)}`).join('\n');
+function reasonLines(result, { cloud = false } = {}) {
+  const fromBalance = new Set(cloud ? result.balanceReasons || [] : []);
+  return result.reasons
+    .filter((r) => !fromBalance.has(r))
+    .map((r) => `- ${plainReason(r)}`)
+    .join('\n');
 }
 
 /**
@@ -62,8 +77,12 @@ const RISK_WORDS = {
   info: 'no red flags found',
 };
 
-/** Short explanation, sized for the on-device model. */
-export function explainPrompt(result, host) {
+/**
+ * Short explanation, sized for the on-device model. `cloud` is set when the
+ * prompt may be answered in the cloud (the hybrid fallback).
+ */
+export function explainPrompt(result, host, { cloud = false } = {}) {
+  const why = reasonLines(result, { cloud });
   return [
     'You are IBITI Guardian, a wallet safety assistant.',
     `The website ${host} asked the user's crypto wallet to confirm a request.`,
@@ -77,8 +96,8 @@ export function explainPrompt(result, host) {
     `Request: ${result.headline}`,
     `Assessment (already decided, do not change it): ${RISK_WORDS[result.risk]}`,
     'Facts:',
-    factLines(result),
-    result.reasons.length ? `Why it matters:\n${reasonLines(result)}` : '',
+    factLines(result, { cloud }),
+    why ? `Why it matters:\n${why}` : '',
   ]
     .filter((line) => line !== '')
     .join('\n');
@@ -86,6 +105,7 @@ export function explainPrompt(result, host) {
 
 /** Deeper analysis for the cloud model, returned as structured JSON. */
 export function deepPrompt(result, host) {
+  const notes = reasonLines(result, { cloud: true });
   return [
     'You are IBITI Guardian, a wallet safety analyst.',
     `The website ${host} asked the user's crypto wallet to confirm the request below.`,
@@ -96,8 +116,8 @@ export function deepPrompt(result, host) {
     `Request: ${result.headline}`,
     `Assessment: ${RISK_WORDS[result.risk]}`,
     'Facts:',
-    factLines(result),
-    result.reasons.length ? `Analyzer notes:\n${reasonLines(result)}` : '',
+    factLines(result, { cloud: true }),
+    notes ? `Analyzer notes:\n${notes}` : '',
     '',
     'Return JSON with:',
     '- summary: one sentence on what this request really is.',

@@ -162,6 +162,21 @@ await step('a dangerous approve is held and described before the wallet sees it'
   assert.equal(await frame.evaluate(() => document.getElementById('origin').textContent), host, 'shows the real site');
   assert.match(await frame.evaluate(() => document.getElementById('headline').textContent), /unlimited/i);
   assert.equal((await walletLog()).length, 0, 'held');
+  // No on-device model in this browser: the cloud is offered for this visit,
+  // with the exact text that would be sent, and nothing is sent until allowed
+  // (see "nothing was sent to any other server" below).
+  await until(frame, () => document.body.dataset.local !== undefined);
+  const offer = await frame.evaluate(() => ({
+    cloud: document.body.dataset.cloud,
+    shown: !document.getElementById('local-fallback').hidden,
+    note: document.getElementById('local-fallback-note').textContent,
+    sent: document.getElementById('local-sent').textContent,
+  }));
+  if (offer.cloud !== 'off') {
+    assert.equal(offer.shown, true, 'the cloud fallback is offered');
+    assert.match(offer.note, /this visit/);
+    assert.match(offer.sent, /Unlimited spending permission/);
+  }
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${PHONE ? 'phone' : 'desktop'}-claim.png`) });
   await frame.click('#reject');
   await panelGone();
