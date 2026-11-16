@@ -47,8 +47,11 @@ Try it (about 1 minute):
   5. Open https://ibiti-guardian-chrome.web.app/ (or press "Try it on the test page"
      in the panel). The page uses a demo wallet: no keys, no funds, nothing on chain.
   6. Press "Claim airdrop". Guardian's own window opens: the request is held,
-     the facts are decoded by code, and Gemini Nano explains it on your device
-     (Firebase AI Logic, InferenceMode.ONLY_ON_DEVICE).
+     the facts and the sentence on what confirming does are written by code,
+     and Gemini Nano reads the request on your device (Firebase AI Logic,
+     InferenceMode.ONLY_ON_DEVICE). Its reading comes back as a JSON form;
+     code compares it with the decoded request and only then shows Gemini's
+     note and marks the reasons it picked.
      No Gemini Nano in your Chrome? Press "Use cloud AI when this computer has
      none" once: from then on the explanation uses InferenceMode.PREFER_ON_DEVICE
      and the SDK falls back to Gemini in the cloud by itself (chip "Cloud
@@ -56,7 +59,8 @@ Try it (about 1 minute):
      turns it off again.
   7. Press "Ask cloud AI": Gemini in the cloud (InferenceMode.ONLY_IN_CLOUD,
      App Check with the judges' debug token in this build) names the scam
-     pattern and what to check.
+     pattern from a fixed list, which code checks against the request, and
+     what to check.
   8. Press "Reject". The page's log says the request was stopped and the demo
      wallet never saw it. The other buttons on the page show the other tricks.
 

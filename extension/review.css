@@ -216,16 +216,29 @@ section > h2 {
   line-height: 1.5;
 }
 
-.ai-text.muted {
+.ai-text.muted,
+.ai-note.muted {
   font-size: 13px;
   color: var(--text-3);
 }
 
-.ai-text.pending {
+/* Gemini's note: its own words, after code has checked its reading. */
+.ai-note {
+  margin: 10px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--brand);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.ai-text.pending,
+.ai-note.pending {
   color: var(--text-2);
 }
 
-.ai-text.pending::after {
+.ai-text.pending::after,
+.ai-note.pending::after {
   content: '';
   display: inline-block;
   width: 6px;
@@ -440,6 +453,20 @@ details.sent pre {
 
 .why li:first-child {
   border-top: 0;
+}
+
+/* The reasons Gemini picked as the most important. */
+.why li .pick {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--brand);
+  color: var(--brand);
+  font-size: 11px;
+  line-height: 1.5;
+  vertical-align: 1px;
+  white-space: nowrap;
 }
 
 .why li::before {

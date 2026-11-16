@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { analyze } from '../src/analyzer/index.js';
-import { deepPrompt, explainPrompt } from '../src/ai/prompt.js';
+import { deepPrompt, readingPrompt } from '../src/ai/prompt.js';
 import { ownAddresses, scrubAddresses, scrubResult } from '../src/ai/guard.js';
 
 const USDT = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
@@ -35,8 +35,8 @@ const cases = {
 for (const [name, result] of Object.entries(cases)) {
   test(`${name}: the balance stays on this computer`, () => {
     // On the device, the explanation may use it.
-    assert.match(explainPrompt(result, 'shop.example'), BALANCE);
-    for (const prompt of [explainPrompt(result, 'shop.example', { cloud: true }), deepPrompt(result, 'shop.example')]) {
+    assert.match(readingPrompt(result, 'shop.example'), BALANCE);
+    for (const prompt of [readingPrompt(result, 'shop.example', { cloud: true }), deepPrompt(result, 'shop.example')]) {
       assert.doesNotMatch(prompt, BALANCE);
       assert.ok(!prompt.toLowerCase().includes(ME), 'the user’s address is not sent');
       assert.match(prompt, /Amount: /, 'the facts are still there');
@@ -47,10 +47,10 @@ for (const [name, result] of Object.entries(cases)) {
 
 test('an approval keeps all its reasons in the cloud prompt', () => {
   const result = analyze(tx(USDT, `0x095ea7b3${pad(OTHER)}${uint((1n << 256n) - 1n)}`));
-  const cloud = explainPrompt(result, 'shop.example', { cloud: true });
+  const cloud = readingPrompt(result, 'shop.example', { cloud: true });
   const why = cloud.split('Why it matters:\n')[1].split('\n');
   assert.equal(why.length, result.reasons.length, 'every reason is there');
-  assert.equal(cloud, explainPrompt(result, 'shop.example'), 'nothing about the balance to leave out');
+  assert.equal(cloud, readingPrompt(result, 'shop.example'), 'nothing about the balance to leave out');
 });
 
 // Exactly as the review window builds what may go to the cloud.
@@ -58,7 +58,7 @@ const cloudPrompts = (record) => {
   const own = ownAddresses(record);
   const result = scrubResult(analyze(record), own);
   return [
-    scrubAddresses(explainPrompt(result, 'shop.example', { cloud: true }), own),
+    scrubAddresses(readingPrompt(result, 'shop.example', { cloud: true }), own),
     scrubAddresses(deepPrompt(result, 'shop.example'), own),
   ];
 };

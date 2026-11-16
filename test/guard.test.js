@@ -377,3 +377,10 @@ test('a self-transfer still checks against the facts', () => {
   const self = analyze(send(ME, '0x', '0x2386f26fc10000'));
   assert.ok(groundTruth(self).hexes.includes(ME));
 });
+
+test('"without moving any assets" is a negation; "without asking, take any of your tokens" is not', () => {
+  passes('signin', 'This request proves you own the wallet to log into the site without moving any assets.');
+  passes('signin', 'It signs you in without touching any of your tokens.');
+  caught('claim', 'The spender could, without asking, take any of your tokens.', /more is at stake/);
+  caught('claim', 'Without moving anything now, it lets the spender take all of your tokens later.', /more is at stake/);
+});

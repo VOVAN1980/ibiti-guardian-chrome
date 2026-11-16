@@ -198,15 +198,17 @@ await step('cloud analysis runs only after the user asks for it', async () => {
       withheld: `${document.body.dataset.cloudWithheld || ''} [${document.body.dataset.cloudWithheldDetail || ''}]`,
       kind: document.body.dataset.patternKind,
       pattern: document.getElementById('cloud-pattern').textContent,
+      reading: document.body.dataset.cloudReading,
     }));
     assert.equal(cloud.state, 'done');
     assert.match(cloud.chip, /^Cloud · \d/);
+    // A dangerous approval to a personal wallet: the model's reading must
+    // match the decoder, and the pattern it names must be approval phishing.
+    assert.equal(cloud.checked, 'passed', `Gemini's analysis: ${String(cloud.reading).replace(/\s+/g, ' ')} ${cloud.withheld}`);
     assert.ok(cloud.summary.length > 20, 'cloud summary is present');
-    // A dangerous approval to a personal wallet: the model must not call it
-    // anything but a known pattern, and its answer must pass the checks.
-    assert.equal(cloud.checked, 'passed', `checked: ${cloud.withheld}`);
     assert.ok(cloud.checks >= 1, 'cloud analysis lists things to check');
-    assert.equal(cloud.kind, 'known_scam_pattern', cloud.pattern);
+    assert.equal(cloud.kind, 'approval_phishing', cloud.pattern);
+    assert.match(cloud.pattern, /^Matches a known scam pattern: approval phishing/);
     assert.ok(calls.some((url) => url.includes('googleapis.com')), 'the cloud call went through Firebase');
     console.log(`     cloud: ${cloud.chip} | ${cloud.summary}`);
   } finally {
@@ -281,13 +283,22 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
       source: document.body.dataset.source,
       chip: document.getElementById('local-chip').textContent,
       text: document.getElementById('local-text').textContent,
+      note: document.getElementById('local-note').hidden ? '' : document.getElementById('local-note').textContent,
       meta: document.getElementById('local-meta').textContent,
+      checked: document.body.dataset.checked,
+      withheld: `${document.body.dataset.withheld || ''} [${document.body.dataset.withheldDetail || ''}]`,
+      reading: document.body.dataset.reading,
     }));
     assert.equal(out.local, 'done', 'the explanation arrived');
     assert.equal(out.source, 'in_cloud', 'the SDK fell back to the cloud');
     assert.match(out.chip, /^Cloud fallback · \d/);
-    assert.ok(out.text.length > 20, 'an explanation is shown');
+    assert.match(out.text, /^If you confirm, someone else, an unknown address \(a personal wallet\), gets permission/);
+    // Gemini's reading must match the decoder. Its note is shown when it
+    // also passes the checks on its words (how often: test/ai-live.mjs).
+    assert.notEqual(out.checked, 'withheld', `Gemini's answer: ${String(out.reading).replace(/\s+/g, ' ')} ${out.withheld}`);
+    assert.ok(out.checked === 'note-withheld' || out.note.length > 20, 'Gemini’s note is shown');
     assert.match(out.meta, /as you allowed/);
+    assert.match(out.meta, /matched Guardian's decoder/);
     assert.ok(first.calls.some((url) => url.includes('googleapis.com')), 'answered through Firebase');
     // What was shown is exactly what went out, and the window says so.
     assert.equal(first.bodies.length, 1, 'one cloud call for the explanation');
@@ -298,7 +309,7 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
       shown: !document.getElementById('local-sent-box').hidden,
     }));
     assert.deepEqual(after, { label: 'Exactly what was sent', sent: offer.sent, shown: true });
-    console.log(`     hybrid: ${out.chip} | ${out.text.slice(0, 90)}`);
+    console.log(`     hybrid: ${out.chip} | ${out.checked} | ${(out.note || out.withheld).slice(0, 90)}`);
   } finally {
     await rejectAndWait(first.review);
   }
@@ -412,7 +423,7 @@ await step('hybrid: turning the permission off stops a cloud request that has no
     }
     const state = await second.evaluate(() => ({
       stopped: document.body.dataset.stopped,
-      text: document.getElementById('local-text').textContent,
+      text: document.getElementById('local-note').textContent,
     }));
     assert.equal(state.stopped, 'turned-off');
     assert.match(state.text, /Cloud AI was turned off/);
@@ -533,6 +544,108 @@ await step('a request Guardian cannot decode is not explained by any AI, even wi
   }
 });
 
+// Gemini Nano's answer, as Chrome would give it: the window shows the code's
+// sentence at once, and Gemini's note only when its reading of the request
+// matches the decoder. The model here is a stand-in that answers what each
+// case needs, so every outcome is checked, every time.
+const RIGHT = {
+  action: 'spending_permission',
+  who_gains: 'another_party',
+  direction: 'out_of_your_wallet',
+  limit: 'unlimited',
+  reasons: [2, 1],
+  note: 'Anyone with this permission could empty this token from your wallet later, without asking you.',
+};
+const NANO_CASES = {
+  'a right reading: its note is shown, its picks are marked': JSON.stringify(RIGHT),
+  'who gains swapped: nothing from it is shown': JSON.stringify({ ...RIGHT, who_gains: 'you' }),
+  'direction swapped: nothing from it is shown': JSON.stringify({ ...RIGHT, direction: 'into_your_wallet' }),
+  'a note that names a token: the note is not shown': JSON.stringify({ ...RIGHT, note: 'Your USDT could be taken at any time.' }),
+  'a note that calls it safe: the note is not shown': JSON.stringify({ ...RIGHT, note: 'This is a normal request and it is safe to confirm.' }),
+  'plain text instead of the form: nothing from it is shown': 'Sure! The spender can take your USDT.',
+};
+for (const [name, answer] of Object.entries(NANO_CASES)) {
+  await step(`on device, ${name}`, async () => {
+    const first = await reviewWithCalls('claim');
+    let tab = null;
+    try {
+      await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
+      tab = await browser.newPage();
+      const calls = [];
+      tab.on('request', (request) => {
+        if (!request.url().startsWith('chrome-extension://')) calls.push(request.url());
+      });
+      await tab.evaluateOnNewDocument((text) => {
+        window.__nano = [];
+        self.LanguageModel = {
+          availability: async () => 'available',
+          create: async () => ({
+            prompt: async (contents, options) => {
+              window.__nano.push({ contents: JSON.stringify(contents), options: JSON.stringify(options || {}) });
+              return text;
+            },
+            promptStreaming: () => {
+              throw new Error('not used');
+            },
+            destroy: () => {},
+          }),
+        };
+      }, answer);
+      tab.goto(first.review.url()).catch(() => {});
+      await tab.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 20000, polling: 200 });
+      const out = await tab.evaluate(() => ({
+        local: document.body.dataset.local,
+        source: document.body.dataset.source,
+        checked: document.body.dataset.checked,
+        withheld: document.body.dataset.withheld || '',
+        chip: document.getElementById('local-chip').textContent,
+        text: document.getElementById('local-text').textContent,
+        note: document.getElementById('local-note').hidden ? null : document.getElementById('local-note').textContent,
+        meta: document.getElementById('local-meta').textContent,
+        picks: [...document.querySelectorAll('#reasons li[data-top]')].map((li) => li.dataset.top),
+        nano: window.__nano,
+      }));
+      assert.equal(out.local, 'done');
+      assert.equal(out.source, 'on_device');
+      assert.match(out.chip, /^On device · \d/);
+      assert.deepEqual(calls, [], 'nothing left the computer');
+      // The code's sentence, whatever the model said.
+      assert.match(out.text, /^If you confirm, someone else, an unknown address \(a personal wallet\), gets permission to take any amount of USDT/);
+      // The model was asked for the form, with the form as its response constraint.
+      assert.equal(out.nano.length, 1);
+      const constraint = JSON.parse(out.nano[0].options).responseConstraint;
+      assert.deepEqual(constraint.properties.who_gains.enum, ['another_party', 'you', 'nobody']);
+      assert.ok(!out.nano[0].contents.toLowerCase().includes('1111111111111111111111111111111111111111'), 'not the user’s address');
+      if (name.startsWith('a right reading')) {
+        assert.equal(out.checked, 'passed');
+        assert.equal(out.note, RIGHT.note);
+        assert.deepEqual(out.picks.sort(), ['1', '2']);
+        assert.match(out.meta, /nothing was sent to an AI service/);
+        assert.match(out.meta, /matched Guardian's decoder/);
+      } else if (name.startsWith('a note')) {
+        assert.equal(out.checked, 'note-withheld');
+        assert.equal(out.note, null, 'the note is not on screen');
+        assert.deepEqual(out.picks.sort(), ['1', '2'], 'its reading matched, so its picks stay');
+        assert.match(out.meta, /but its note was not shown/);
+        assert.doesNotMatch(out.meta, /USDT could|safe to confirm/, 'the window does not repeat it');
+      } else {
+        assert.equal(out.checked, 'withheld');
+        assert.equal(out.note, null, 'nothing from the model is on screen');
+        assert.deepEqual(out.picks, []);
+        assert.match(
+          out.meta,
+          name.startsWith('plain text') ? /no usable answer/ : /a different reading of the request \((who gains|which way assets move)\)/,
+        );
+      }
+      // The decision still works.
+      assert.equal(await tab.evaluate(() => !document.getElementById('reject').disabled), true);
+    } finally {
+      if (tab) await tab.close().catch(() => {});
+      await rejectAndWait(first.review);
+    }
+  });
+}
+
 // However the AI service fails, the facts are there at once and Reject and
 // Continue keep working: the AI is never in the way of the decision.
 let expectedWallet = 1;
@@ -596,7 +709,7 @@ for (const mode of ['unreachable', 'over quota', 'silent', 'timed out']) {
       } else {
         const wait = mode === 'timed out' ? 40000 : 20000;
         await tab.waitForFunction(() => document.body.dataset.local === 'error', { timeout: wait });
-        const said = await tab.evaluate(() => document.getElementById('local-text').textContent);
+        const said = await tab.evaluate(() => document.getElementById('local-note').textContent);
         const expected = {
           unreachable: /could not be reached\. The facts below do not depend on it/,
           'over quota': /busy right now \(usage limit\)\. The facts below do not depend on it/,

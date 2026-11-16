@@ -1,0 +1,345 @@
+{
+ "claim": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [1, 2],\n  \"note\": \"The spender can take this token from your wallet at any time without asking you again. The spender is a personal wallet rather than an app.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request gives a spender endless permission to take this token from your wallet.\",\n  \"checks\": [\n    \"Check if you intended to grant spending access for this token to the spender.\",\n    \"Verify whether the spender is a known and trusted entity rather than a personal wallet.\",\n    \"Confirm that you are comfortable with an unlimited limit for this permission.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [1, 2],\n  \"note\": \"This gives the spender full control over this token in your wallet. Because the spender is a personal wallet and not an application, you should be very careful.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request gives a third party unlimited permission to take this token from your wallet at any time.\",\n  \"checks\": [\n    \"Check if you intended to grant spending access to this specific spender.\",\n    \"Verify whether the spender is a recognized contract rather than a personal wallet.\",\n    \"Confirm that you want to allow unlimited access for this token.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the spender can take any amount of this token from your wallet at any time without asking you again. The spender is a personal wallet, which is unusual for a real application.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request grants an outside party permanent, unlimited permission to take this token from your wallet at any time.\",\n  \"checks\": [\n    \"Verify whether you trust the spender with your tokens.\",\n    \"Check if the site asking for this permission is known and expected.\",\n    \"Confirm whether a spending permission of this size is truly necessary.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "permit": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the spender can take any amount of this token from your wallet at any time without asking you again. The spender is a personal wallet rather than an app.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"permit_phishing\",\n  \"summary\": \"This request grants an outside party the unlimited right to take this token from your wallet at any time.\",\n  \"checks\": [\n    \"Verify whether you trust the spender to hold this power.\",\n    \"Check if the site asking for this permission is the one you intended to use.\",\n    \"Confirm that you meant to grant an unlimited amount rather than a specific limited one.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the spender can take any amount of this token from your wallet at any time. Legitimate apps almost never ask a personal wallet to act as the spender.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request gives the spender unlimited permission to take this token from your wallet.\",\n  \"checks\": [\n    \"Verify whether you intended to give this specific spender access to this token.\",\n    \"Check if the spender is a recognized contract rather than a personal wallet.\",\n    \"Confirm that you trust the site asking for this permission.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the spender can take any amount of this token from your wallet at any time without asking you again. The spender is a personal wallet rather than an app contract.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"You are giving someone else permission to take an unlimited amount of this token from your wallet whenever they want.\",\n  \"checks\": [\n    \"Verify if the spender address is trusted.\",\n    \"Confirm whether you intend to grant unlimited access for this token.\",\n    \"Check if the site requesting this permission is the one you expect.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "nft": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the operator gains full control to move every item in this collection from your wallet at any time. Legitimate apps rarely use a personal wallet for this kind of access.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"collection_approval_phishing\",\n  \"summary\": \"This request gives someone else full permission to transfer every item you own in this collection.\",\n  \"checks\": [\n    \"Verify if you intended to grant full collection access to this operator.\",\n    \"Check whether the operator is a trusted contract rather than a personal wallet.\",\n    \"Confirm that you trust the site asking for this permission.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    2,\n    1\n  ],\n  \"note\": \"Someone else gets permission to move every item you own in this collection at any time. Legitimate apps rarely use a personal wallet for this.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"collection_approval_phishing\",\n  \"summary\": \"This request gives someone else full permission to transfer every item you own in this collection.\",\n  \"checks\": [\n    \"Verify whether you intended to give full control of this collection to an outside address.\",\n    \"Check if the site asking for this access is one you trust.\",\n    \"Remember that personal wallets rarely need this level of access.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"If you confirm, the operator gains full control to move every item in this collection from your wallet at any time. Legitimate apps rarely use personal wallets for this kind of access.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"collection_access\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"unlimited\",\n  \"pattern\": \"collection_approval_phishing\",\n  \"summary\": \"This request gives another party permission to transfer every item you own in this collection from your wallet at any time.\",\n  \"checks\": [\n    \"Verify if you intended to grant full control over this collection.\",\n    \"Check if the operator is an entity you trust.\",\n    \"Confirm why a personal wallet needs collection access.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "fake": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [\n    2,\n    1\n  ],\n  \"note\": \"The spender is a personal wallet rather than an app. This could let someone take this token from your wallet whenever they want.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request gives the spender permission to take a specific amount of this token from your wallet at any time.\",\n  \"checks\": [\n    \"Verify whether you trust the spender to access this token.\",\n    \"Check if the token is the official asset you expect.\",\n    \"Confirm why a personal wallet is requesting this permission instead of a recognized contract.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [\n    2,\n    1\n  ],\n  \"note\": \"You are giving a personal wallet the right to take a specific token from you at any time. Legitimate apps generally do not use personal wallets for this.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request grants a spender the right to take a specific amount of this token from your wallet.\",\n  \"checks\": [\n    \"Verify whether you trust the spender with permission to take this token.\",\n    \"Check if this token matches the official asset you intend to interact with.\",\n    \"Confirm that the spender is an official application contract rather than an unknown personal wallet.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [\n    1,\n    2\n  ],\n  \"note\": \"You are giving the spender the right to take a limited amount of this token from your wallet at any time. The spender is a personal wallet, which is unusual for apps.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request grants the spender permission to take a specific amount of this token from your wallet at any time.\",\n  \"checks\": [\n    \"Verify whether you trust the spender to access this token.\",\n    \"Check if the token is the official asset you intend to interact with.\",\n    \"Confirm that the spender is an official application contract rather than an unknown personal wallet.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "phish": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"You are signing in to a different site than the one you are currently visiting. Someone could use this signature to log in as you on that other site.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"sign_in_phishing\",\n  \"summary\": \"This request asks you to sign in for a different site than the one you are currently visiting.\",\n  \"checks\": [\n    \"Check if you intended to log into the mentioned site\",\n    \"Verify the address of the site making the request\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"You are signing in for a different site than the one you are currently visiting. If you confirm, someone could use this signature to log in as you on that other site.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"sign_in_phishing\",\n  \"summary\": \"This request asks you to sign a message that logs you into a site different from the one you are currently visiting.\",\n  \"checks\": [\n    \"Verify whether you intend to log into the mentioned site.\",\n    \"Check if the site asking for the signature matches the site you expect to use.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"You are signing in to a different site than the one you are currently visiting. Someone could use this signature to log in as you on that other site.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"sign_in_phishing\",\n  \"summary\": \"This request asks you to sign in to one site while you are browsing a different site.\",\n  \"checks\": [\n    \"Check which site made the request\",\n    \"Check which site the sign-in is for\",\n    \"Confirm you trust both sites before proceeding\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "transfer": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [\n    1\n  ],\n  \"note\": \"This sends your coins straight to the recipient. Once you confirm, this transfer cannot be undone.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request sends coins from your wallet to the recipient.\",\n  \"checks\": [\n    \"Verify the recipient address is correct.\",\n    \"Check that the amount matches your expectation.\",\n    \"Confirm you trust the site asking for this payment.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [1],\n  \"note\": \"This sends coins straight to the recipient. A confirmed transfer cannot be undone.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request sends coins directly from your wallet to the recipient.\",\n  \"checks\": [\n    \"Verify the recipient address is correct.\",\n    \"Confirm you intend to send this specific amount.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [1],\n  \"note\": \"This sends coins straight to the recipient. A confirmed transfer cannot be undone.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"payment\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request sends a direct payment of coins from your wallet to the recipient.\",\n  \"checks\": [\n    \"Verify that you know and trust the recipient address.\",\n    \"Confirm that you intended to send this exact amount.\",\n    \"Check that you are interacting with the correct site.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "limited": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [1, 2],\n  \"note\": \"The spender can take up to the specified limit of this token from your wallet at any time without asking you again. The permission stays active until you revoke it.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request gives the spender the ability to transfer a specific amount of this token from your wallet in the future.\",\n  \"checks\": [\n    \"Verify that you trust the spender with this token.\",\n    \"Confirm that the amount matches your expectations.\",\n    \"Check if you intend to grant ongoing access for future transactions.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [1, 2],\n  \"note\": \"The spender can take this token from your wallet at any time without asking you again. The permission stays active until you revoke it.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request grants the spender permission to move a limited amount of this token from your wallet in the future.\",\n  \"checks\": [\n    \"Verify that you trust the spender.\",\n    \"Check that the requested token and amount match your intentions.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"reasons\": [1, 2],\n  \"note\": \"The spender can take this token from your wallet at any time without asking you again until you revoke the permission.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"spending_permission\",\n  \"who_gains\": \"another_party\",\n  \"direction\": \"out_of_your_wallet\",\n  \"limit\": \"limited\",\n  \"pattern\": \"approval_phishing\",\n  \"summary\": \"This request lets the spender take a limited amount of this token from your wallet whenever it wants until you revoke the permission.\",\n  \"checks\": [\n    \"Verify that you trust the spender with this token.\",\n    \"Confirm the requested amount matches your expectations.\",\n    \"Check that you initiated this interaction with the site.\"\n  ]\n}",
+   "expected": "hide",
+   "why": "names a known scam pattern on a request with no red flags"
+  }
+ ],
+ "signin": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"This action proves you own the wallet. It does not move any of your assets or give the site permission to spend them.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request asks you to prove you own your wallet to log into the site, and does not move any of your assets.\",\n  \"checks\": [\n    \"Verify that you intend to sign in to this specific site.\",\n    \"Check that the message text contains only log-in instructions and no hidden commands.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [\n    1\n  ],\n  \"note\": \"This only proves you own your wallet and does not let the site take anything.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request proves you own the wallet to log into the site without moving any assets.\",\n  \"checks\": [\n    \"Verify you intend to log into the site.\",\n    \"Check that the site address is correct.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"This proves you own the wallet. It does not move any assets.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"sign_in\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This request proves you own your wallet to log into the site.\",\n  \"checks\": [\n    \"Verify that you intend to log into this site.\",\n    \"Check that the site address matches where you want to sign in.\"\n  ]\n}",
+   "expected": "show"
+  }
+ ],
+ "revoke": [
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [\n    1\n  ],\n  \"note\": \"This takes away an allowance you previously gave, so the spender can no longer touch this token. Nothing leaves your wallet.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This removes an existing permission that previously allowed the spender to access this token.\",\n  \"checks\": [\n    \"Verify that you intended to revoke access for this spender.\",\n    \"Check that the network fee is acceptable.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"This takes away permission so the spender can no longer touch this token. Nothing leaves your wallet.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This removes an existing permission that previously allowed the spender to access this token.\",\n  \"checks\": [\n    \"Verify that you intended to revoke access for this spender.\",\n    \"Check that the network fee is acceptable.\"\n  ]\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud fallback (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "explain",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"reasons\": [1],\n  \"note\": \"This takes away permission so the spender can no longer touch this token. Nothing leaves your wallet.\"\n}",
+   "expected": "show"
+  },
+  {
+   "source": "cloud deep analysis (gemini-3.5-flash-lite), 2026-11-16",
+   "form": "deep",
+   "text": "{\n  \"action\": \"remove_permission\",\n  \"who_gains\": \"nobody\",\n  \"direction\": \"nothing_moves\",\n  \"limit\": \"does_not_apply\",\n  \"pattern\": \"no_known_pattern\",\n  \"summary\": \"This removes an existing spending permission for this token.\",\n  \"checks\": [\n    \"Verify that you intended to revoke this permission\",\n    \"Check that the spender matches the one you want to disconnect\"\n  ]\n}",
+   "expected": "show"
+  }
+ ]
+}
