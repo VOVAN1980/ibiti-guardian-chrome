@@ -14,9 +14,9 @@ does the same check in front of your real wallet).
 <a href="https://youtu.be/1xGWgzLbLEM"><img src="docs/video.jpg" alt="Watch the video: IBITI Guardian for Chrome — know what you sign" width="640"></a>
 
 <p>
-  <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval: facts decoded by code, explained on device by Gemini Nano" width="360">
+  <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval: the sentence and the warnings are written by code; Gemini Nano read the request on the device" width="360">
   &nbsp;
-  <img src="docs/review-cloud.png" alt="The optional cloud analysis through Firebase AI Logic" width="360">
+  <img src="docs/review-cloud.png" alt="The optional cloud analysis through Firebase AI Logic: a scam pattern and things to check, picked from fixed lists that code checks" width="360">
 </p>
 
 Built for #BuildHybridAI 2026.
