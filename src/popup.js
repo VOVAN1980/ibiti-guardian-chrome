@@ -54,7 +54,7 @@ if (last && typeof last.at === 'number') {
         last.checked === 'withheld'
           ? 'its answer was not used'
           : last.checked === 'passed'
-            ? 'its reading matched the decoder'
+            ? `its reading matched the decoder${last.retried ? ' (in the cloud, after Gemini Nano’s did not)' : ''}`
             : null,
       ];
   show('last', parts.filter(Boolean).join(' · '), !last.error && last.source === 'on_device' && last.requests === 0 ? 'ok' : 'off');
@@ -64,7 +64,7 @@ if (last && typeof last.at === 'number') {
 // The one-time permission for the hybrid fallback (same key as host.js).
 const fallback = $('fallback');
 const fallbackText = (on) => {
-  $('fallback-text').textContent = on ? 'On: Gemini in the cloud explains instead' : 'Off: only Gemini Nano explains';
+  $('fallback-text').textContent = on ? 'On: Gemini in the cloud steps in' : 'Off: only Gemini Nano';
   $('fallback-text').className = on ? 'ok' : 'off';
 };
 if (aiBuilt && cloudReady) {

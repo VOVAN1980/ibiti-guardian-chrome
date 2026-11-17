@@ -130,6 +130,20 @@ export async function readHybrid(prompt, { deviceReady = false, signal } = {}) {
 }
 
 /**
+ * The short explanation from Gemini in the cloud only: once, when Gemini
+ * Nano's reading did not match the decoder, and only when the user has
+ * allowed the cloud for that. `prompt` is the cloud-safe text.
+ * @returns {{text: string, ms: number, source: string}}
+ */
+export async function readInCloud(prompt, { signal } = {}) {
+  const model = getGenerativeModel(inCloud(), {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: cloudParams(READING_SCHEMA),
+  });
+  return answer(model, prompt, signal);
+}
+
+/**
  * The deeper analysis from the cloud model. Call only after the user asked.
  * @returns {{text: string, ms: number, source: string}}  text: the form, as JSON
  */

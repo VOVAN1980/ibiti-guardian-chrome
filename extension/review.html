@@ -41,11 +41,11 @@
           <p class="ai-meta" id="local-check"></p>
         </details>
         <div class="fallback" id="local-fallback" hidden>
-          <button class="quiet" id="local-fallback-allow" type="button">Use cloud AI when this computer has none</button>
+          <button class="quiet" id="local-fallback-allow" type="button">Allow cloud AI as a fallback</button>
           <p class="ai-meta" id="local-fallback-note">
-            Gemini in the cloud then explains instead, through Firebase: now and next time, whenever this computer has
-            no on-device model. Sends the decoded details below, never your wallet address. Turn it off in Guardian’s
-            toolbar panel.
+            Gemini in the cloud then reads the request through Firebase, now and next time: whenever this computer has
+            no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. Sends the
+            decoded details below, never your wallet address. Turn it off in Guardian’s toolbar panel.
           </p>
         </div>
         <details class="sent" id="local-sent-box" hidden>
@@ -76,6 +76,7 @@
         </div>
         <div id="cloud-result" hidden>
           <span class="pattern" id="cloud-pattern"></span>
+          <p class="ai-meta" id="cloud-pattern-note" hidden></p>
           <p class="top-label" id="cloud-checks-label">Things to check:</p>
           <ul class="checks" id="cloud-checks"></ul>
           <p class="ai-sub" id="cloud-confirm" hidden></p>

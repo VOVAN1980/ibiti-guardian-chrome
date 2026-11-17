@@ -259,7 +259,7 @@ test('warnings come from code and stay first: Gemini adds emphasis, it cannot dr
   }
 });
 
-test('the deeper analysis names a scam pattern only where the request has its shape', () => {
+test('the deeper analysis names a scam pattern only with evidence the analyzer found', () => {
   const deep = (name, pattern) => checkReading(rightDeep(R[name], { pattern }), R[name], { deep: true }).match;
   assert.equal(deep('claim', 'approval_phishing'), true);
   assert.equal(deep('claim', 'permit_phishing'), false);
@@ -268,12 +268,26 @@ test('the deeper analysis names a scam pattern only where the request has its sh
   assert.equal(deep('fake', 'fake_token'), true);
   assert.equal(deep('permit', 'permit_phishing'), true);
   assert.equal(deep('permit', 'approval_phishing'), true, 'a permit is an approval by signature');
-  assert.equal(deep('permitTransfer', 'permit_phishing'), true);
   assert.equal(deep('nft', 'collection_approval_phishing'), true);
   assert.equal(deep('phish', 'sign_in_phishing'), true);
   assert.equal(deep('signin', 'sign_in_phishing'), false, 'a sign-in for this same site');
   assert.equal(deep('batchOk', 'risky_action_in_a_batch'), true);
-  assert.equal(deep('order', 'marketplace_order_phishing'), true);
+  // An approval, a permit, a batch or an order is no scam by itself: without
+  // the analyzer's warnings, no known pattern fits.
+  assert.equal(R.increase.risk, 'caution');
+  assert.equal(deep('increase', 'approval_phishing'), false, 'a limited approval to an unknown contract');
+  assert.equal(R.permitTransfer.risk, 'caution');
+  assert.equal(deep('permitTransfer', 'permit_phishing'), false, 'a limited one-time signature to an unknown contract');
+  assert.equal(deep('order', 'marketplace_order_phishing'), false, 'not on the list: Guardian cannot see an order’s price');
+  assert.equal(deep('order', 'no_known_pattern'), true);
+  assert.equal(deep('order', 'cannot_determine'), true);
+  assert.ok(!('marketplace_order_phishing' in PATTERNS));
+  for (const [name, p] of Object.entries(PATTERNS)) {
+    if (['no_known_pattern', 'cannot_determine'].includes(name)) continue;
+    for (const [rname, result] of Object.entries(R)) {
+      if (p.fits(result)) assert.ok(result.risk === 'danger' && result.warnings.length > 0, `${name} fits ${rname} without evidence`);
+    }
+  }
   // Never a known scam on a request with no red flags.
   assert.equal(R.limited.risk, 'info');
   assert.equal(deep('limited', 'approval_phishing'), false);

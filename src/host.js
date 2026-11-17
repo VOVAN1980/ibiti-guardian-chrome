@@ -35,7 +35,8 @@ export function closeReview() {
 }
 
 // The user's one-time permission to use Gemini in the cloud when this
-// computer has no on-device model. Off until the user turns it on. The
+// computer has no on-device model, and once more when Gemini Nano's answer
+// does not pass Guardian's check. Off until the user turns it on. The
 // extension keeps it (chrome.storage.local, which pages cannot reach); the
 // hosted preview keeps it for this visit only.
 const FALLBACK_KEY = 'cloudFallback';

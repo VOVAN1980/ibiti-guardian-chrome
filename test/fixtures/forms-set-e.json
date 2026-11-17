@@ -1,7 +1,12 @@
 {
  "made": "2026-11-17, blind author; measured once on e6b4175 (video/pipeline/live/holdout/result-E-first-run-e6b4175.txt)",
  "disagree": {
-  "oneTimeTake/deep/field_pattern": "approval_phishing is accepted for a permit signature too: a permit is an approval given by signature, and live Gemini names it so (test/fixtures/real-forms.json)."
+  "oneTimeTake/deep/field_pattern": "approval_phishing is accepted for a permit signature too: a permit is an approval given by signature, and live Gemini names it so (test/fixtures/real-forms.json).",
+  "increaseUsdc/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "listingOrder/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "listingOrder/deep/note_safe": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "batchSwap/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "batchSwap/deep/note_names": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone."
  },
  "entries": [
   {

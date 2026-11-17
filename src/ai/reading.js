@@ -147,38 +147,37 @@ function readingOf(result) {
 // ── The deeper analysis: a pattern and things to check, from fixed lists ───
 
 // Scam patterns the deeper analysis may name. The model picks one; code
-// checks that the request has what the pattern is about, and the label the
-// user reads is written here.
+// checks it, and the label the user reads is written here. A known pattern
+// needs evidence the analyzer found, not just a kind of request: an approval,
+// a permit or a marketplace order is no scam by itself. So each one needs a
+// request Guardian rates high risk, with its warnings; a marketplace order is
+// not on the list, because Guardian cannot see its price or items.
+const evidence = (r) => r.risk === 'danger' && (r.warnings || []).length > 0;
 export const PATTERNS = {
   approval_phishing: {
-    label: 'Matches a known scam pattern: approval phishing, a spending permission for someone else',
+    label: 'Has the shape of approval phishing: a spending permission, with the warnings above',
     // A permit is an approval given by signature.
-    fits: (r) => r.kind === 'approve' || r.kind === 'permit' || r.kind === 'permit2',
+    fits: (r) => ['approve', 'permit', 'permit2'].includes(r.kind) && evidence(r),
   },
   permit_phishing: {
-    label: 'Matches a known scam pattern: permit phishing, a signature that lets someone take tokens',
-    fits: (r) => r.kind === 'permit' || r.kind === 'permit2',
+    label: 'Has the shape of permit phishing: a signature that lets someone take tokens, with the warnings above',
+    fits: (r) => ['permit', 'permit2'].includes(r.kind) && evidence(r),
   },
   collection_approval_phishing: {
-    label: 'Matches a known scam pattern: collection approval phishing, access to every item in a collection',
-    fits: (r) => r.kind === 'approveAll',
+    label: 'Has the shape of collection approval phishing: access to every item in a collection, with the warnings above',
+    fits: (r) => r.kind === 'approveAll' && evidence(r),
   },
   fake_token: {
-    label: 'Matches a known scam pattern: a fake token that borrows a famous name',
-    fits: (r) => tokensOf(r).some((t) => t && t.impersonates),
+    label: 'Has the shape of a fake-token scam: a token that borrows a famous name',
+    fits: (r) => tokensOf(r).some((t) => t && t.impersonates) && evidence(r),
   },
   sign_in_phishing: {
-    label: 'Matches a known scam pattern: a sign-in message for a different site',
-    fits: (r) => r.kind === 'signIn' && Boolean(sub(r).mismatch),
-  },
-  marketplace_order_phishing: {
-    label: 'Matches a known scam pattern: a marketplace order signature that gives items away',
-    fits: (r) => r.kind === 'order',
+    label: 'Has the shape of sign-in phishing: a sign-in message for a different site',
+    fits: (r) => r.kind === 'signIn' && Boolean(sub(r).mismatch) && evidence(r),
   },
   risky_action_in_a_batch: {
-    label: 'Matches a known scam pattern: a risky action hidden among others in one confirmation',
-    // At least one part that is not ordinary.
-    fits: (r) => r.kind === 'batch' && (r.parts || []).length > 1 && r.parts.some((p) => p.risk !== 'info'),
+    label: 'Has the shape of a risky action hidden among others in one confirmation, with the warnings above',
+    fits: (r) => r.kind === 'batch' && (r.parts || []).length > 1 && r.parts.some((p) => p.risk === 'danger') && evidence(r),
   },
   no_known_pattern: {
     label: 'No known scam pattern matched. That alone does not make it safe',
@@ -189,6 +188,9 @@ export const PATTERNS = {
     fits: () => true,
   },
 };
+/** Under a known pattern, in code's words: a shape is not proof. */
+export const PATTERN_NOTE =
+  'A pattern is not proof of a scam: it is what the warnings Guardian found have in common with known scams.';
 const KNOWN = (pattern) => pattern !== 'no_known_pattern' && pattern !== 'cannot_determine';
 
 const PERMISSIONS = ['approve', 'permitTransfer', 'permit2Batch'];

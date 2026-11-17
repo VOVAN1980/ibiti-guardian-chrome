@@ -54,11 +54,12 @@ Try it (about 1 minute):
      code compares it with the decoded request and only then adds the
      reasons Gemini picked under "Most important", after Guardian's own
      warnings. Every word in the window is written by code.
-     No Gemini Nano in your Chrome? Press "Use cloud AI when this computer has
-     none" once: from then on the explanation uses InferenceMode.PREFER_ON_DEVICE
-     and the SDK falls back to Gemini in the cloud by itself (chip "Cloud
-     fallback"). "Exactly what was sent" shows the text; the toolbar panel
-     turns it off again.
+     No Gemini Nano in your Chrome? Press "Allow cloud AI as a fallback"
+     once: from then on the reading uses InferenceMode.PREFER_ON_DEVICE and
+     the SDK falls back to Gemini in the cloud by itself (chip "Cloud
+     fallback"). With Gemini Nano, the same permission lets the cloud read the
+     request once more when Nano's answer does not pass Guardian's check.
+     "Exactly what was sent" shows the text; the toolbar panel turns it off.
   7. Press "Ask cloud AI": Gemini in the cloud (InferenceMode.ONLY_IN_CLOUD,
      App Check with the judges' debug token in this build) names the scam
      pattern and what to check, from fixed lists that code checks against

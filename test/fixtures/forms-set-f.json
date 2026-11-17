@@ -1,7 +1,12 @@
 {
  "made": "2026-11-17, blind author; measured once on 1407081 (video/pipeline/live/holdout/result-F-first-run-1407081.txt)",
  "disagree": {
-  "daiPermitAll/deep/field_pattern": "approval_phishing is accepted for a permit signature too: a permit is an approval given by signature, and live Gemini names it so."
+  "daiPermitAll/deep/field_pattern": "approval_phishing is accepted for a permit signature too: a permit is an approval given by signature, and live Gemini names it so.",
+  "permit2TwoEnds/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "permit2TwoEnds/deep/note_scope": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "batchRevokeAndPay/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "singleOrder/deep/correct": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone.",
+  "singleOrder/deep/note_names": "Since 2026-11-17 a known scam pattern needs evidence Guardian found (a high-risk request with warnings): an approval, a permit, a batch or a marketplace order is no scam by itself. The author named this one from the kind of request alone."
  },
  "entries": [
   {
