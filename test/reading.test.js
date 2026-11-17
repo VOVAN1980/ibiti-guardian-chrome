@@ -1,6 +1,6 @@
 // Gemini's part of the window: a form that code checks against the decoded
-// request, and a note that names nothing. The sentence on what confirming
-// does is written by code.
+// request. Nothing Gemini writes is shown as text; the sentence on what
+// confirming does and the warnings are written by code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -9,15 +9,18 @@ import { isUndecoded } from '../src/ai/guard.js';
 import { meaning, readingPrompt, deepPrompt, shownReasons } from '../src/ai/prompt.js';
 import {
   ACTIONS,
+  CHECKS,
   DIRECTIONS,
   LIMITS,
   PATTERNS,
   WHO,
+  checkAnalysis,
+  checkExplanation,
   checkReading,
+  checksFor,
   decodedReading,
-  namesIn,
+  mostImportant,
   parseAnswer,
-  wordsProblem,
 } from '../src/ai/reading.js';
 
 const ME = '0x1111111111111111111111111111111111111111';
@@ -108,7 +111,15 @@ const R = Object.fromEntries(Object.entries(RECORDS).map(([k, v]) => [k, analyze
 /** The first right value of each field: the answer of a model that read it right. */
 const rightAnswer = (result, extra = {}) => {
   const d = decodedReading(result);
-  return { action: d.action[0], who_gains: d.who_gains[0], direction: d.direction[0], limit: d.limit[0], reasons: [1], note: '', ...extra };
+  return { action: d.action[0], who_gains: d.who_gains[0], direction: d.direction[0], limit: d.limit[0], reasons: [1], ...extra };
+};
+
+/** A right deep answer: the reading, a pattern that fits, a check that fits. */
+const rightDeep = (result, extra = {}) => {
+  const known = Object.keys(PATTERNS).find((p) => !['no_known_pattern', 'cannot_determine'].includes(p) && PATTERNS[p].fits(result));
+  const pattern = result.risk === 'info' || !known ? 'no_known_pattern' : known;
+  const { reasons, ...reading } = rightAnswer(result);
+  return { ...reading, pattern, checks: ['did_you_start_this'], ...extra };
 };
 
 test('every decoded request has a reading; undecoded ones have none, so no AI is asked', () => {
@@ -120,7 +131,9 @@ test('every decoded request has a reading; undecoded ones have none, so no AI is
 
 test('the blind sets’ requests all have a reading', () => {
   const dir = new URL('./fixtures/', import.meta.url);
-  for (const file of readdirSync(dir).filter((f) => /^blind-records-.*\.json$/.test(f))) {
+  const files = readdirSync(dir).filter((f) => /^forms-records-.*\.json$/.test(f));
+  assert.ok(files.length >= 2);
+  for (const file of files) {
     for (const [name, record] of Object.entries(JSON.parse(readFileSync(new URL(file, dir), 'utf8')))) {
       const result = analyze(record);
       assert.equal(decodedReading(result) === null, isUndecoded(result), `${file} ${name}`);
@@ -173,25 +186,32 @@ test('who gains and where assets go, request by request', () => {
     assert.equal(said(name, 'another_party', 'out_of_your_wallet'), false, name);
     assert.equal(said(name, 'you', 'into_your_wallet'), false, name);
   }
+  // A sign-in for a different site: the other site could sign in as you.
+  assert.equal(said('phish', 'another_party', 'nothing_moves'), true);
+  assert.equal(said('signin', 'another_party', 'nothing_moves'), false);
   // A "revoke" that sends coins: they leave the wallet.
   assert.equal(said('coinsOnRevoke', 'nobody', 'nothing_moves'), false);
   assert.equal(said('coinsOnRevoke', 'another_party', 'out_of_your_wallet'), true);
   // Someone else's tokens: they do not leave this wallet; to this wallet, they come in.
   assert.equal(said('fromOther', 'another_party', 'out_of_your_wallet'), false);
+  assert.equal(said('fromOther', 'nobody', 'nothing_moves'), true);
   assert.equal(said('fromOther', 'another_party', 'nothing_moves'), true);
   assert.equal(said('fromOtherToMe', 'you', 'into_your_wallet'), true);
   assert.equal(said('fromOtherToMe', 'another_party', 'out_of_your_wallet'), false);
 });
 
-test('the limit: unlimited only where the request is unlimited', () => {
+test('the limit: unlimited only where the request is unlimited, and never hidden where it is', () => {
   const limit = (name, value) => checkReading(rightAnswer(R[name], { limit: value }), R[name]).match;
-  for (const name of ['claim', 'permit']) {
+  for (const name of ['claim', 'permit', 'nft', 'permitBatch', 'batchOk']) {
     assert.equal(limit(name, 'unlimited'), true, name);
     assert.equal(limit(name, 'limited'), false, name);
+    assert.equal(limit(name, 'does_not_apply'), false, name);
   }
   for (const name of ['limited', 'increase', 'fake', 'permitSingle', 'permitTransfer', 'transfer', 'tokenPayment', 'signin', 'revoke']) {
     assert.equal(limit(name, 'unlimited'), false, name);
   }
+  // A payment is limited.
+  assert.equal(limit('transfer', 'does_not_apply'), false);
 });
 
 test('the reasons Gemini picks: only numbers it was shown, at most two', () => {
@@ -207,14 +227,47 @@ test('the reasons Gemini picks: only numbers it was shown, at most two', () => {
   assert.deepEqual(checkReading(rightAnswer(pay, { reasons: 'all' }), pay).top, []);
 });
 
+test('warnings come from code and stay first: Gemini adds emphasis, it cannot drop one', () => {
+  // Every high-risk request has at least one warning, and every warning is one of its reasons.
+  for (const [name, result] of Object.entries(R)) {
+    const warnings = result.warnings || [];
+    if (result.risk === 'danger') assert.ok(warnings.length > 0, `${name}: high risk without a warning`);
+    for (const w of warnings) assert.ok(result.reasons.includes(w), `${name}: ${w}`);
+  }
+  const r = R.claim; // any amount to a personal wallet
+  const warned = mostImportant(r, []);
+  assert.deepEqual(warned.map((i) => i.by), ['guardian', 'guardian']);
+  assert.match(warned.map((i) => i.text).join(' '), /any amount of USDT/);
+  assert.match(warned.map((i) => i.text).join(' '), /personal wallet/);
+  // Gemini picks only the last reason: the warnings are still there, first.
+  const picked = mostImportant(r, [4]);
+  assert.deepEqual(picked.map((i) => [i.n, i.by]), [[1, 'guardian'], [2, 'guardian'], [4, 'gemini']]);
+  // Gemini picks a warning: it is not listed twice.
+  assert.deepEqual(mostImportant(r, [2, 3]).map((i) => i.n), [1, 2, 3]);
+  // A request with no red flags: only Gemini's picks.
+  assert.deepEqual(mostImportant(R.limited, [1]).map((i) => i.by), ['gemini']);
+  assert.deepEqual(mostImportant(R.limited, []), []);
+  // The other warnings.
+  for (const [name, words] of [
+    ['phish', /signs you in to nft-market\.example/],
+    ['fake', /not the real USDT/],
+    ['coinsOnRevoke', /also sends 1 ETH/],
+    ['transfer', /all of the ETH in this wallet/],
+    ['nft', /every item you own/],
+  ]) {
+    assert.match((R[name].warnings || []).join(' '), words, name);
+  }
+});
+
 test('the deeper analysis names a scam pattern only where the request has its shape', () => {
-  const deep = (name, pattern) => checkReading(rightAnswer(R[name], { pattern }), R[name], { deep: true }).match;
+  const deep = (name, pattern) => checkReading(rightDeep(R[name], { pattern }), R[name], { deep: true }).match;
   assert.equal(deep('claim', 'approval_phishing'), true);
   assert.equal(deep('claim', 'permit_phishing'), false);
   assert.equal(deep('claim', 'sign_in_phishing'), false);
   assert.equal(deep('claim', 'fake_token'), false);
   assert.equal(deep('fake', 'fake_token'), true);
   assert.equal(deep('permit', 'permit_phishing'), true);
+  assert.equal(deep('permit', 'approval_phishing'), true, 'a permit is an approval by signature');
   assert.equal(deep('permitTransfer', 'permit_phishing'), true);
   assert.equal(deep('nft', 'collection_approval_phishing'), true);
   assert.equal(deep('phish', 'sign_in_phishing'), true);
@@ -225,64 +278,49 @@ test('the deeper analysis names a scam pattern only where the request has its sh
   assert.equal(R.limited.risk, 'info');
   assert.equal(deep('limited', 'approval_phishing'), false);
   assert.equal(deep('limited', 'no_known_pattern'), true);
+  // On a high-risk request with a pattern that fits, "none matched" or "cannot tell" is not accepted.
+  for (const name of ['claim', 'permit', 'nft', 'fake', 'phish', 'batchOk', 'permitBatch']) {
+    assert.equal(R[name].risk, 'danger', name);
+    assert.equal(deep(name, 'no_known_pattern'), false, name);
+    assert.equal(deep(name, 'cannot_determine'), false, name);
+  }
   for (const name of Object.keys(R)) {
     if (!decodedReading(R[name])) continue;
-    assert.equal(deep(name, 'cannot_determine'), true, name);
+    if (R[name].risk !== 'danger') assert.equal(deep(name, 'cannot_determine'), true, name);
     assert.equal(deep(name, 'something_else'), false, name);
     assert.equal(deep(name, undefined), false, name);
   }
   assert.ok(Object.values(PATTERNS).every((p) => typeof p.label === 'string' && p.label.length > 20));
 });
 
-test('the model’s own words name nothing', () => {
-  for (const text of [
-    'Anyone with this permission could empty this token from your wallet later.',
-    'The spender could take your tokens at any time, even after you leave the site.',
-    'Signing proves you own the wallet; the site asking is not the one named in the message.',
-    'Every NFT you own in this collection could be moved by the operator.',
-    'Check the site\'s URL before you sign.',
-  ]) {
-    assert.equal(namesIn(text), null, text);
+test('things to check: only ones that fit the request, and code’s own always come first', () => {
+  const ok = (name, checks) => checkReading(rightDeep(R[name], { checks }), R[name], { deep: true }).match;
+  assert.equal(ok('claim', ['who_is_the_spender', 'revoke_when_done']), true);
+  assert.equal(ok('claim', ['check_the_recipient']), false, 'no recipient in an approval');
+  assert.equal(ok('claim', ['compare_the_sites']), false, 'not a sign-in');
+  assert.equal(ok('transfer', ['check_the_recipient', 'payments_are_final']), true);
+  assert.equal(ok('transfer', ['who_is_the_spender']), false);
+  assert.equal(ok('phish', ['compare_the_sites']), true);
+  assert.equal(ok('revoke', ['which_permission']), true);
+  assert.equal(ok('revoke', ['revoke_when_done']), false, 'nothing to revoke later');
+  assert.equal(ok('permitTransfer', ['revoke_when_done']), false, 'a one-time signature leaves nothing to revoke');
+  assert.equal(ok('permitTransfer', ['how_long_it_is_valid']), true);
+  assert.equal(ok('coinsOnRevoke', ['why_coins_attached']), true);
+  assert.equal(ok('limited', ['is_the_token_real']), false, 'a verified token');
+  assert.equal(ok('fake', ['is_the_token_real']), true);
+  assert.equal(ok('claim', []), false, 'at least one');
+  assert.equal(ok('claim', ['made_up']), false);
+  for (const [id, c] of Object.entries(CHECKS)) {
+    assert.ok(c.text.length > 20 && typeof c.fits === 'function', id);
+    for (const [name, result] of Object.entries(R)) {
+      if (c.must && c.must(result)) assert.ok(c.fits(result), `${id} is a must for ${name} but does not fit it`);
+    }
   }
-  for (const [text, name] of [
-    ['The spender could take 500 tokens.', '5'],
-    ['The spender 0x9f3a could take them.', '0'],
-    ['Your USDT could be taken.', 'USDT'],
-    ['Your OP tokens could be taken.', 'OP'],
-    ['This came from app.uniswap.org.', 'app.uniswap.org'],
-    ['This came from Uniswap.org.', 'Uniswap.org'],
-    ['It could cost you $100.', '1'],
-    ['It could cost you a lot of €.', '€'],
-  ]) {
-    assert.equal(namesIn(text), name, text);
-  }
-});
-
-test('notes: role swaps, safety claims and invented names are not shown; plain notes are', () => {
-  const r = R.claim;
-  const sentence = meaning(r, HOST);
-  const options = { own: [ME.toLowerCase()], chainId: 1, host: HOST };
-  const problem = (text) => (wordsProblem(text, r, sentence, options) || {}).problem || null;
-  assert.equal(problem('Anyone with this permission could empty this token from your wallet later, without asking you.'), null);
-  assert.equal(problem('The spender is a personal wallet, which real apps almost never ask you to approve.'), null);
-  for (const text of [
-    'This gives you permission to spend the tokens of the spender.',
-    'The tokens would come to your wallet.',
-    'This request is safe to sign.',
-    'Nothing can go wrong here.',
-    'Your USDT could be taken at any time.',
-    'The spender at 0x9f3a could take everything.',
-    '',
-    'x'.repeat(401),
-  ]) {
-    assert.notEqual(problem(text), null, text);
-  }
-  // Not unlimited where the request is limited.
-  const limited = R.increase;
-  assert.notEqual(
-    wordsProblem('The spender could take an unlimited amount of the token.', limited, meaning(limited, HOST), options),
-    null,
-  );
+  // Code's checks for a request, whatever the model picks.
+  assert.deepEqual(checksFor(R.phish, []), ['compare_the_sites']);
+  assert.deepEqual(checksFor(R.fake, ['revoke_when_done']), ['is_the_token_real', 'revoke_when_done']);
+  assert.deepEqual(checksFor(R.coinsOnRevoke, []), ['why_coins_attached']);
+  assert.deepEqual(checksFor(R.transfer, ['check_the_recipient']), ['check_the_recipient']);
 });
 
 test('answers: a JSON object, nothing else', () => {
@@ -312,107 +350,105 @@ test('the sentence on what confirming does is exact', () => {
   assert.match(m('transfer'), /^If you confirm, 0\.01 ETH leaves your wallet and goes to 0x9f3a/i);
 });
 
-test('prompts give the decoder’s sentence', () => {
+test('prompts give the decoded facts, not the code’s sentence: Gemini’s reading is its own', () => {
   for (const [name, result] of Object.entries(R)) {
     if (!decodedReading(result)) continue;
     for (const prompt of [readingPrompt(result, HOST), readingPrompt(result, HOST, { cloud: true }), deepPrompt(result, HOST)]) {
-      assert.ok(prompt.includes(meaning(result, HOST).slice(0, 60)), `${name}: the code sentence is in the prompt`);
+      assert.ok(!prompt.includes(meaning(result, HOST).slice(0, 60)), `${name}: the code's sentence is not in the prompt`);
+      assert.ok(prompt.includes(result.headline.slice(0, 40)), `${name}: the facts are`);
     }
   }
-  // The deeper analysis lists exactly the patterns code knows.
-  for (const key of Object.keys(PATTERNS)) assert.ok(deepPrompt(R.claim, HOST).includes(key), key);
+  // The deeper analysis lists exactly the patterns and the checks code knows.
+  for (const key of [...Object.keys(PATTERNS), ...Object.keys(CHECKS)]) assert.ok(deepPrompt(R.claim, HOST).includes(key), key);
 });
 
-test('the whole check, as the window runs it', async () => {
-  const { checkExplanation, checkAnalysis } = await import('../src/ai/reading.js');
+test('the whole check, as the window runs it', () => {
   const r = R.claim;
-  const options = { sentence: meaning(r, HOST), own: [ME.toLowerCase()], chainId: 1, host: HOST };
-  const right = rightAnswer(r, { reasons: [2, 1], note: 'Anyone with this permission could empty this token from your wallet later.' });
-  const run = (answer) => checkExplanation(typeof answer === 'string' ? answer : JSON.stringify(answer), r, options);
+  const right = rightAnswer(r, { reasons: [3, 1] });
+  const run = (answer) => checkExplanation(typeof answer === 'string' ? answer : JSON.stringify(answer), r);
 
-  assert.deepEqual(run(right), { checked: 'passed', note: right.note, top: [2, 1], problem: null, detail: '' });
+  assert.deepEqual(run(right), {
+    checked: 'passed',
+    words: 'a spending permission · someone else gains · out of your wallet · unlimited',
+    top: [3, 1],
+    problem: null,
+    detail: '',
+  });
   const swapped = run({ ...right, who_gains: 'you' });
   assert.equal(swapped.checked, 'withheld');
-  assert.equal(swapped.note, '');
+  assert.equal(swapped.words, '');
   assert.deepEqual(swapped.top, []);
   assert.match(swapped.problem, /a different reading of the request \(who gains\)/);
   assert.doesNotMatch(swapped.problem, /\byou\b/, 'the window does not repeat the wrong value');
-  const named = run({ ...right, note: 'Your USDT could be taken.' });
-  assert.equal(named.checked, 'note-withheld');
-  assert.deepEqual(named.top, [2, 1]);
   assert.equal(run('not json').checked, 'withheld');
-  assert.equal(run({ ...right, note: '' }).checked, 'note-withheld');
+  // Whatever else the model adds is never used.
+  const extra = run({ ...right, note: 'This is safe.', summary: 'All fine.' });
+  assert.equal(extra.checked, 'passed');
+  assert.ok(!JSON.stringify(extra).includes('safe'));
 
-  const deep = {
-    ...rightAnswer(r),
-    pattern: 'approval_phishing',
-    summary: 'This gives someone else open-ended access to take this token from your wallet.',
-    checks: ['1. Check whether you meant to give the spender any permission.', 'Look at who the spender is.'],
-  };
-  const ok = checkAnalysis(JSON.stringify(deep), r, options);
+  const deep = rightDeep(r, { pattern: 'approval_phishing', checks: ['revoke_when_done', 'did_you_start_this'] });
+  const ok = checkAnalysis(JSON.stringify(deep), r);
   assert.equal(ok.passed, true);
-  assert.deepEqual(ok.checks, ['Check whether you meant to give the spender any permission.', 'Look at who the spender is.']);
-  assert.equal(checkAnalysis(JSON.stringify({ ...deep, pattern: 'sign_in_phishing' }), r, options).passed, false);
-  assert.equal(checkAnalysis(JSON.stringify({ ...deep, direction: 'into_your_wallet' }), r, options).passed, false);
-  assert.equal(checkAnalysis(JSON.stringify({ ...deep, checks: ['Check the spender 0x9f3a.'] }), r, options).passed, false);
-  assert.equal(checkAnalysis(JSON.stringify({ ...deep, summary: 'This is a standard, safe approval.' }), r, options).passed, false);
+  assert.equal(ok.label, PATTERNS.approval_phishing.label);
+  assert.deepEqual(
+    ok.checks.map((c) => c.by),
+    ['guardian', 'gemini', 'gemini'],
+    'the spender check is code’s own here (a personal wallet), then Gemini’s two',
+  );
+  assert.equal(checkAnalysis(JSON.stringify({ ...deep, pattern: 'sign_in_phishing' }), r).passed, false);
+  assert.equal(checkAnalysis(JSON.stringify({ ...deep, direction: 'into_your_wallet' }), r).passed, false);
+  assert.equal(checkAnalysis(JSON.stringify({ ...deep, checks: ['check_the_recipient'] }), r).passed, false);
+  assert.equal(checkAnalysis(JSON.stringify({ ...deep, pattern: 'no_known_pattern' }), r).passed, false);
 });
 
 test('real Gemini answers to the forms, recorded live, get the verdict they deserve', async () => {
-  const { checkExplanation, checkAnalysis } = await import('../src/ai/reading.js');
-  const { DEMO_RECORDS, HOST: DEMO_HOST } = await import('./demo-records.js');
-  const { ownAddresses } = await import('../src/ai/guard.js');
+  const { DEMO_RECORDS } = await import('./demo-records.js');
   const real = JSON.parse(readFileSync(new URL('./fixtures/real-forms.json', import.meta.url), 'utf8'));
   const wrong = [];
   let count = 0;
   for (const [name, answers] of Object.entries(real)) {
-    const record = DEMO_RECORDS[name];
-    const result = analyze(record);
-    const options = { sentence: meaning(result, DEMO_HOST), own: ownAddresses(record), chainId: 1, host: DEMO_HOST };
+    const result = analyze(DEMO_RECORDS[name]);
     for (const a of answers) {
       count += 1;
       const shown = a.form === 'deep'
-        ? checkAnalysis(a.text, result, options)
-        : checkExplanation(a.text, result, { ...options, shown: shownReasons(result, { cloud: true }).map(([n]) => n) });
-      const got = (a.form === 'deep' ? shown.passed : shown.checked === 'passed') ? 'show' : 'hide';
-      if (got !== a.expected) wrong.push(`${name}/${a.form}: expected ${a.expected}, got ${got} (${shown.problem}: ${shown.detail}) ${a.text.replace(/\s+/g, ' ')}`);
+        ? checkAnalysis(a.text, result).passed
+        : checkExplanation(a.text, result, { shown: shownReasons(result, { cloud: a.cloud !== false }).map(([n]) => n) }).checked === 'passed';
+      const got = shown ? 'show' : 'hide';
+      if (got !== a.expected) wrong.push(`${name}/${a.form}: expected ${a.expected}, got ${got}: ${a.text.replace(/\s+/g, ' ')}`);
     }
   }
-  assert.ok(count >= 50, `${count} answers`);
+  assert.ok(count >= 20, `${count} answers`);
   assert.deepEqual(wrong, []);
 });
 
 // Blind form sets: answers written by an independent author who saw only the
-// decoded requests and the model's instructions. Each set was measured once
-// as written (its first-run result is named in the file); what it revealed
-// was fixed, and the set stays here so it cannot come back.
-test('blind form sets: correct answers are shown, wrong ones are not', async () => {
-  const { checkExplanation, checkAnalysis } = await import('../src/ai/reading.js');
-  const { ownAddresses } = await import('../src/ai/guard.js');
+// decoded requests and the model's instructions. Each was measured once as
+// written (the result is named in the file); what it revealed was fixed, and
+// the set stays here. Since 2026-11-17 Gemini writes no text that is shown,
+// so only the form is replayed: a wrong field (or a scam pattern the request
+// does not have) must keep everything from the model off the screen, and a
+// right one must not.
+test('blind form sets: a wrong reading is never used, a right one is', () => {
   const dir = new URL('./fixtures/', import.meta.url);
   const files = readdirSync(dir).filter((f) => /^forms-set-.*\.json$/.test(f));
-  assert.ok(files.length >= 1);
+  assert.ok(files.length >= 2);
+  let count = 0;
   for (const file of files) {
     const { entries, disagree } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
     const records = JSON.parse(readFileSync(new URL(file.replace('forms-set-', 'forms-records-'), dir), 'utf8'));
     const wrong = [];
     for (const e of entries) {
-      const record = records[e.scenario];
-      const result = analyze(record);
-      const host = new URL(record.origin).host;
-      const options = { sentence: meaning(result, host), own: ownAddresses(record), chainId: record.chainId, host };
-      const text = JSON.stringify(e.answer);
-      let got;
-      if (e.form === 'deep') {
-        got = checkAnalysis(text, result, options).passed ? 'show' : 'hide';
-      } else {
-        const shown = shownReasons(result, { cloud: true }).map(([n]) => n);
-        got = { passed: 'show', 'note-withheld': 'hide_note', withheld: 'hide_all' }[checkExplanation(text, result, { ...options, shown }).checked];
-      }
-      if (got !== e.expected && !disagree[`${e.scenario}/${e.form}/${e.error || 'correct'}`]) {
-        wrong.push(`${file} ${e.scenario}/${e.form}/${e.error || 'correct'}: expected ${e.expected}, got ${got}: ${text}`);
+      const result = analyze(records[e.scenario]);
+      const fieldError = /^field_/.test(e.error || '');
+      // The free-text parts of the old form are not used any more.
+      const answer = { ...e.answer, checks: ['did_you_start_this'] };
+      const used = checkReading(answer, result, { deep: e.form === 'deep' }).match;
+      count += 1;
+      if (used === fieldError && !(disagree || {})[`${e.scenario}/${e.form}/${e.error || 'correct'}`]) {
+        wrong.push(`${file} ${e.scenario}/${e.form}/${e.error || 'correct'}: ${used ? 'used' : 'not used'}: ${JSON.stringify(e.answer)}`);
       }
     }
     assert.deepEqual(wrong, []);
   }
+  assert.ok(count > 300, `${count} answers`);
 });

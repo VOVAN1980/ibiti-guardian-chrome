@@ -105,3 +105,17 @@ test('a token cannot name itself into the prompt', () => {
   const ok = analyze({ ...record, enrich: { ...record.enrich, token: { symbol: 'PEPE2', decimals: 18 } } });
   assert.match(ok.facts.find((f) => f.label === 'Token').value, /^PEPE2 /);
 });
+
+test('the user’s own address is found in every kind of request and scrubbed', async () => {
+  const { DEMO_RECORDS, ME: DEMO_ME } = await import('./demo-records.js');
+  for (const [name, record] of Object.entries(DEMO_RECORDS)) assert.deepEqual(ownAddresses(record), [DEMO_ME], name);
+  assert.deepEqual(ownAddresses({ method: 'wallet_sendCalls', params: [{ from: DEMO_ME, calls: [] }] }), [DEMO_ME]);
+  const text = `Owner ${DEMO_ME}, again ${DEMO_ME.toUpperCase().replace('0X', '0x')} and bare ${DEMO_ME.slice(2)}.`;
+  const out = scrubAddresses(text, [DEMO_ME]);
+  assert.ok(!out.toLowerCase().includes(DEMO_ME.slice(2)), out);
+  assert.equal(out.match(/\(your own wallet\)/g).length, 3);
+  // And never in a prompt, for any demo request.
+  for (const record of Object.values(DEMO_RECORDS)) {
+    for (const prompt of cloudPrompts(record)) assert.ok(!prompt.toLowerCase().includes(DEMO_ME.slice(2)), prompt);
+  }
+});

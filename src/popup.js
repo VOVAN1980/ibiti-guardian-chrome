@@ -52,12 +52,10 @@ if (last && typeof last.at === 'number') {
         typeof last.ms === 'number' ? `answered in ${s(last.ms)}` : null,
         `${last.requests ?? '?'} network requests from Guardian’s window`,
         last.checked === 'withheld'
-          ? 'answer not shown: its reading differed from the decoder'
-          : last.checked === 'note-withheld'
-            ? 'reading matched, note not shown'
-            : last.checked === 'passed'
-              ? 'reading matched the decoder'
-              : null,
+          ? 'its answer was not used'
+          : last.checked === 'passed'
+            ? 'its reading matched the decoder'
+            : null,
       ];
   show('last', parts.filter(Boolean).join(' · '), !last.error && last.source === 'on_device' && last.requests === 0 ? 'ok' : 'off');
   $('last-row').hidden = false;

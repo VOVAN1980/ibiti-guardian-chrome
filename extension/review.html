@@ -28,9 +28,18 @@
           <span class="chip" id="local-chip" hidden></span>
         </div>
         <p class="ai-text" id="local-text"></p>
+        <div class="important" id="local-important" hidden>
+          <p class="top-label">Most important:</p>
+          <ul class="top" id="local-top"></ul>
+          <p class="ai-meta" id="local-picked" hidden></p>
+        </div>
         <p class="ai-note" id="local-note" hidden></p>
         <button class="quiet" id="local-download" type="button" hidden>Download the on-device model (one time)</button>
         <p class="ai-meta" id="local-meta" hidden></p>
+        <details class="sent" id="local-check-box" hidden>
+          <summary>How Gemini’s answer was checked</summary>
+          <p class="ai-meta" id="local-check"></p>
+        </details>
         <div class="fallback" id="local-fallback" hidden>
           <button class="quiet" id="local-fallback-allow" type="button">Use cloud AI when this computer has none</button>
           <p class="ai-meta" id="local-fallback-note">
@@ -66,10 +75,14 @@
           <span class="chip" id="cloud-chip" hidden></span>
         </div>
         <div id="cloud-result" hidden>
-          <p class="ai-text" id="cloud-summary"></p>
-          <p class="ai-sub" id="cloud-confirm"></p>
           <span class="pattern" id="cloud-pattern"></span>
+          <p class="top-label" id="cloud-checks-label">Things to check:</p>
           <ul class="checks" id="cloud-checks"></ul>
+          <p class="ai-sub" id="cloud-confirm" hidden></p>
+          <details class="sent" id="cloud-check-box" hidden>
+            <summary>How Gemini’s analysis was checked</summary>
+            <p class="ai-meta" id="cloud-summary"></p>
+          </details>
         </div>
         <button class="quiet" id="cloud-ask" type="button">Ask cloud AI</button>
         <p class="ai-meta" id="cloud-consent">
