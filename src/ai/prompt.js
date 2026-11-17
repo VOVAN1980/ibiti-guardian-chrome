@@ -82,8 +82,7 @@ export function meaning(result, host) {
   // An unverified token names itself: its symbol is the token's own words.
   const symbolOf = (token) =>
     token && token.symbol ? (token.verified ? token.symbol : quoted(token.symbol, 24)) : 'this token';
-  const who = (name, label) =>
-    name ? `${name}, a well-known service,` : `someone else, an unknown address${note(label) ? ` (a ${note(label)})` : ''},`;
+  const who = (name, label) => (name ? `${name} (a well-known service)` : `an unknown ${note(label) || 'address'}`);
   const coins = s.coins ? ` It also sends ${s.coins} to the contract ${s.contract}.` : '';
   const actions = Array.isArray(s.actions) ? s.actions : [];
 
@@ -91,8 +90,8 @@ export function meaning(result, host) {
     case 'approve': {
       const what = s.unlimited ? `any amount of ${symbolOf(s.token)}` : `up to ${s.amount}${s.more ? ' more' : ''}`;
       const lasts = s.lasts || 'until you revoke it';
-      const when = /^only\b/.test(lasts) ? lasts : `at any time, without asking you again, ${lasts}`;
-      return `If you confirm, ${who(s.spenderName, 'Spender')} gets permission to take ${what} out of your wallet, ${when}.${coins}`;
+      const when = /^only\b/.test(lasts) ? lasts : `whenever it wants, without asking you, ${lasts}`;
+      return `If you confirm, ${who(s.spenderName, 'Spender')} can take ${what} from your wallet, ${when}.${coins}`;
     }
     case 'permitTransfer': {
       const what = s.unlimited ? `any amount of ${symbolOf(s.token)}` : `up to ${s.amount}`;

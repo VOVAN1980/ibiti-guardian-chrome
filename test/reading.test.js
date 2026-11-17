@@ -347,9 +347,10 @@ test('answers: a JSON object, nothing else', () => {
 
 test('the sentence on what confirming does is exact', () => {
   const m = (name) => meaning(R[name], HOST);
-  assert.match(m('claim'), /someone else, an unknown address \(a personal wallet\), gets permission to take any amount of USDT out of your wallet, at any time, without asking you again, until you revoke it\.$/);
-  assert.match(m('increase'), /up to 5 USDC more out of your wallet/);
-  assert.match(m('permit2Approve'), /up to 10 USDC out of your wallet, at any time, without asking you again, until \d{4}-\d\d-\d\d \d\d:\d\d UTC, unless you revoke it sooner\.$/);
+  assert.equal(m('claim'), 'If you confirm, an unknown personal wallet can take any amount of USDT from your wallet, whenever it wants, without asking you, until you revoke it.');
+  assert.match(m('limited'), /^If you confirm, Uniswap Permit2 \(a well-known service\) can take up to 25 USDC from your wallet,/);
+  assert.match(m('increase'), /an unknown address can take up to 5 USDC more from your wallet/);
+  assert.match(m('permit2Approve'), /up to 10 USDC from your wallet, whenever it wants, without asking you, until \d{4}-\d\d-\d\d \d\d:\d\d UTC, unless you revoke it sooner\.$/);
   assert.match(m('permitSingle'), /for more than a year, unless you revoke it sooner\.$/);
   assert.match(m('permitTransfer'), /can take up to 800 USDC out of your wallet, once, at any time until this signature expires\.$/);
   assert.match(m('permitBatch'), /the amounts listed below, of 2 tokens, out of your wallet, for more than a year, unless you revoke them sooner\.$/);

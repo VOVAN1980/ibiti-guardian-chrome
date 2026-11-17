@@ -6,7 +6,7 @@
   --line: #1f2836;
   --text: #f1f4f9;
   --text-2: #a9b4c4;
-  --text-3: #6d798b;
+  --text-3: #7d8a9d;
   --brand: #19d3e6;
   --danger: #ff5f5f;
   --danger-bg: #24090c;
@@ -39,6 +39,11 @@ body[data-risk='info'] {
 
 * {
   box-sizing: border-box;
+}
+
+/* Hidden means hidden, whatever display a rule gives the element. */
+[hidden] {
+  display: none !important;
 }
 
 html,
@@ -199,9 +204,9 @@ section > h2 {
 }
 
 .chip[data-source='on_device'] {
-  background: var(--info-bg);
-  border: 1px solid var(--info-line);
-  color: var(--info);
+  background: rgba(25, 211, 230, 0.08);
+  border: 1px solid rgba(25, 211, 230, 0.32);
+  color: var(--brand);
 }
 
 .chip[data-source='in_cloud'] {
@@ -223,7 +228,6 @@ section > h2 {
   line-height: 1.5;
 }
 
-.ai-text.muted,
 .ai-note.muted {
   font-size: 13px;
   color: var(--text-3);
@@ -237,7 +241,7 @@ section > h2 {
   color: var(--text-2);
 }
 
-/* Most important: Guardian's warnings (always) and Gemini's picks. */
+/* The reasons listed first: Guardian's warnings (always) and Gemini's picks. */
 .important {
   margin-top: 12px;
 }
@@ -269,9 +273,10 @@ section > h2 {
 
 .top li::before,
 .checks li::before {
-  content: '•';
+  content: '✦';
   position: absolute;
-  left: 6px;
+  left: 3px;
+  font-size: 12px;
   color: var(--brand);
 }
 
@@ -282,12 +287,10 @@ section > h2 {
   color: var(--risk);
 }
 
-.ai-text.pending,
 .ai-note.pending {
   color: var(--text-2);
 }
 
-.ai-text.pending::after,
 .ai-note.pending::after {
   content: '';
   display: inline-block;
@@ -296,7 +299,6 @@ section > h2 {
   margin-left: 8px;
   border-radius: 50%;
   background: var(--brand);
-  animation: pulse 1s ease-in-out infinite;
   vertical-align: middle;
 }
 
@@ -478,7 +480,7 @@ details.sent pre {
   border-bottom: 0;
 }
 
-/* ── Why this matters ───────────────────────────────────────────────────── */
+/* ── Also worth knowing ─────────────────────────────────────────────────── */
 
 .why,
 .message {
@@ -602,11 +604,237 @@ button:disabled {
   gap: 6px;
   margin: 10px 0 0;
   font-size: 12px;
+  color: var(--text-2);
+}
+
+/* ── The button pressed against what the request does ──────────────────── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hero .ai-text {
+  margin: 8px 0 0;
+  color: var(--text);
+}
+
+.promise {
+  margin: 0 0 10px;
+}
+
+.promise .label {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-3);
 }
 
-.hold svg {
-  width: 13px;
-  height: 13px;
+.said {
+  padding: 10px 12px 11px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--risk-line);
+  border-radius: 12px;
+}
+
+.words {
+  display: block;
+  margin: 3px 0 1px;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.reading {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* The heading unclear words sit under: what Gemini reads them with. */
+.context {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+/* Read by Gemini, not by code. */
+.reading[data-by='gemini']::before {
+  content: '✦ ';
+  color: var(--brand);
+}
+
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+.verdict::before,
+.verdict::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--risk-line);
+}
+
+.verdict > span[aria-hidden] {
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  text-align: center;
+}
+
+.verdict[data-state='clash'] > span[aria-hidden] {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #12070a;
+}
+
+.verdict[data-state='clash'] > span[aria-hidden]::before {
+  content: '✕ ';
+}
+
+/* Gemini's reading adds a warning but never the risk level: outlined. */
+.verdict[data-state='clash'][data-by='gemini'] > span[aria-hidden] {
+  background: transparent;
+  color: var(--danger);
+}
+
+.verdict[data-state='pending'] > span[aria-hidden] {
+  border-color: rgba(25, 211, 230, 0.32);
+  color: var(--brand);
+}
+
+.verdict[data-state='pending'] > span[aria-hidden]::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  vertical-align: middle;
+}
+
+/* Consent to send something: readable, not small print. */
+.consent {
+  color: var(--text-2);
+}
+
+.ai:focus {
+  outline: none;
+}
+
+.ai:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ── Held: Guardian has the request, the wallet has not ───────────────── */
+
+.held {
+  width: 7px;
+  height: 7px;
   flex: none;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+/* ── Motion: held, then what it does, then the verdict. Nothing waits. ──── */
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-shown] .said,
+  body[data-shown] .promise > .label,
+  body[data-shown] #headline,
+  body[data-shown] #local-text,
+  body[data-shown] #local,
+  body[data-shown] .facts {
+    animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  body[data-shown] .promise > .label,
+  body[data-shown] .promise:not([hidden]) ~ #headline {
+    animation-delay: 0.1s;
+  }
+
+  body[data-shown] #local-text {
+    animation-delay: 0.18s;
+  }
+
+  body[data-shown] #local {
+    animation-delay: 0.28s;
+  }
+
+  body[data-shown] .facts {
+    animation-delay: 0.36s;
+  }
+
+  /* The verdict lands once what it compares is on screen. */
+  body[data-shown] .verdict {
+    animation: stamp 0.35s 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .held {
+    animation: held 2.4s ease-in-out infinite;
+  }
+
+  .ai-note.pending::after,
+  .verdict[data-state='pending'] > span[aria-hidden]::after {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes held {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 211, 230, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(25, 211, 230, 0);
+  }
+}
+
+.verdict[hidden] + .label {
+  margin-top: 12px;
 }

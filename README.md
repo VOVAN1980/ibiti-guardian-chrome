@@ -66,8 +66,9 @@ request does (`src/analyzer/promise.js`). Addresses in these words, whole or
 shortened, are taken out before anything is cut short, shown or sent.
 
 - **Code reads plain words** — claim, reward, eligibility, sign in, verify,
-  revoke, mint, swap, pay, stake, approve. The button shows among the facts
-  (*Button pressed*). Only a clear contradiction is a warning: a button that
+  revoke, mint, swap, pay, stake, approve. The window opens on the
+  comparison: *The button said “Claim airdrop”*, then *Does not match*, then
+  what the request really does. Only a clear contradiction is a warning: a button that
   offers to receive something, to sign in or to remove a permission, on a
   request that takes assets out or grants a permission (a sign-in or a revoke
   also on coins sent to a contract call Guardian cannot read); or a mint,
@@ -84,12 +85,14 @@ shortened, are taken out before anything is cut short, shown or sent.
   on a token permission (redeeming shares or a paid entry can rightly need
   one); *Collect* on a marketplace order for the user's own items stays a
   warning, since no purchase needs one. A contradiction read by code makes
-  the request *High risk*.
+  the request *High risk*. *No mismatch found* is said only by code, and only
+  on a request with no red flags.
 - **Gemini reads the words code cannot** — *Continue*, *Получить бонус*,
   *立即领取* — judging by the button's words, the page title and the heading,
   not by the request. Its reading is used only when its whole form passed the
-  check, only to add a warning (in code's words, saying it is Gemini's
-  reading), never to change the risk level.
+  check, only to add a warning (in code's words, marked ✦ and *read by
+  Gemini*), never to change the risk level and never to say there is no
+  mismatch.
 
 Measured on 2026-11-17 with Gemini Nano in Chrome, on a small sample of 8
 unclear buttons in English, Russian and Chinese: 6 of 8 read exactly as meant
@@ -125,9 +128,9 @@ the form against the decoded request before using any of it.
 
 - **Code** (`src/analyzer/`, `src/ai/prompt.js`) writes the facts, the risk
   level, one sentence on what confirming does — for example *If you confirm,
-  someone else, an unknown address (a personal wallet), gets permission to
-  take any amount of USDT out of your wallet, at any time, without asking you
-  again, until you revoke it.* — and the **warnings**: the reasons that alone
+  an unknown personal wallet can take any amount of USDT from your wallet,
+  whenever it wants, without asking you, until you revoke it.* — and the
+  **warnings**: the reasons that alone
   make a request high risk (a personal wallet as the spender, an unlimited
   permission for an unknown address, a token that borrows a famous name, coins
   attached to a token call, a sign-in for a different site, almost the whole
@@ -140,10 +143,10 @@ the form against the decoded request before using any of it.
 - **Code compares the form with the decoded request.** If any field differs
   — "you" gain where someone else does, assets "come in" where they go out,
   "limited" where it is unlimited — none of the answer is used. If all fields
-  match, the reasons Gemini picked are added under **Most important**, after
-  the warnings, in the analyzer's own words. The main view never says that
-  Gemini "agrees" (that could read as an all-clear); how its answer was
-  checked is under **How Gemini's answer was checked**.
+  match, the reasons Gemini picked are added after the warnings (marked ✦),
+  in the analyzer's own words. The main view never says that Gemini "agrees"
+  (that could read as an all-clear); how its answer was checked is under
+  **How Gemini's answer was checked**.
 - **The deeper analysis** answers the same reading, plus a scam pattern and
   the things to check, each picked from a fixed list written in code. A known
   pattern needs evidence the analyzer found: an approval, a permit or a batch
@@ -206,13 +209,17 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
 ## Try it in two minutes
 
 1. Open https://ibiti-guardian-chrome.web.app and press **Claim airdrop**.
-   The request is held; read the facts; press **Reject** or **Continue**. The
-   log at the bottom says whether the demo wallet ever saw it.
-2. Press the other buttons: five things drainers ask for, and four ordinary
-   requests that Guardian should not make a fuss about.
+   The request is held. The window opens on what the button said against
+   what the request really does (*Does not match*); press **Reject** or
+   **Continue**. The strip at the top of the page shows where the request
+   went: stopped at Guardian, or through to the demo wallet.
+2. Press **Approve 25 USDC for a swap** next to it: an ordinary request, and
+   Guardian stays calm. More examples are below: five other things drainers
+   ask for, and three ordinary requests.
 3. In **Write the button yourself**, type any words for the button (try
    *Continue* or *Approve and claim*) and choose what it really asks for: see
-   when Guardian says the button and the request do not match.
+   when Guardian says the button and the request do not match, and when
+   Gemini reads words code cannot (marked ✦).
 4. Press **Turn Guardian off to see the difference** and click again: the
    same request goes straight to the wallet.
 

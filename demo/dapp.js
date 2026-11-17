@@ -186,9 +186,35 @@ pickEl.addEventListener('change', () => {
   renderWallets();
 });
 
+// Where the request is: held at Guardian, stopped there, or at the wallet.
+const flowEl = document.getElementById('flow');
+const FLOW = {
+  idle: guarded ? 'Press a button: the request stops at Guardian first.' : 'Guardian is off: a request goes straight to the wallet.',
+  held: 'Held by Guardian. Decide in its window: the wallet has not seen the request.',
+  stopped: 'Stopped by Guardian. The wallet never saw it.',
+  passed: 'You let it through: the wallet got the request unchanged.',
+  unguarded: 'Nothing in between: the request went straight to the wallet.',
+};
+// Requests still waiting for the user's decision (a double click sends two).
+let held = 0;
+function setFlow(where) {
+  if (!flowEl) return;
+  const now = guarded && held > 0 ? 'held' : where;
+  flowEl.dataset.state = now;
+  // A real wallet shows the request itself once Guardian lets it through.
+  document.getElementById('flow-note').textContent =
+    now === 'held' && !isDemo(currentWallet()) ? 'Held by Guardian until you decide; then your wallet shows it.' : FLOW[now];
+}
+if (flowEl) {
+  flowEl.dataset.guard = guarded ? 'on' : 'off';
+  setFlow('idle');
+}
+
 function report(entry) {
   state.last = entry;
   state.history.push(entry);
+  const stopped = !entry.ok && /^IBITI Guardian/.test(entry.message || '');
+  setFlow(entry.code === 'not sent' || entry.message === 'No wallet found.' ? 'idle' : stopped ? 'stopped' : guarded ? 'passed' : 'unguarded');
   // The button's words when it was pressed (the card's can change meanwhile).
   const button = document.querySelector(`[data-scenario="${entry.scenario}"]`);
   const name = entry.name || (button ? button.textContent.trim() : entry.scenario);
@@ -242,7 +268,11 @@ async function run(scenario, name) {
   try {
     const request = SCENARIOS[scenario]();
     state.sent = JSON.parse(JSON.stringify(request)); // what the site asked for
-    const result = await provider.request(request);
+    held += 1;
+    setFlow(guarded ? 'held' : 'unguarded');
+    const result = await provider.request(request).finally(() => {
+      held -= 1;
+    });
     report({ scenario, name, ok: true, result });
   } catch (error) {
     report({ scenario, name, ok: false, code: error && error.code, message: String((error && error.message) || error) });
