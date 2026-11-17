@@ -19,7 +19,7 @@ import {
   wordToBigInt,
 } from './abi.js';
 import { PERMIT2, chainInfo, knownSpender, knownToken } from './registry.js';
-import { cleanPromise, contradiction, offerOf } from './promise.js';
+import { cleanPromise, contradiction, offersOf } from './promise.js';
 
 const SELECTOR = {
   approve: '0x095ea7b3',
@@ -69,8 +69,8 @@ export function analyze(req) {
  */
 function withPromise(result, promise) {
   if (!promise) return result;
-  const offer = offerOf(promise.button);
-  const clash = contradiction(offer, result, promise.button);
+  const offers = offersOf(promise.button);
+  const clash = contradiction(offers, result, promise.button);
   const facts = [...result.facts];
   facts.splice(1, 0, fact('Button pressed', promise.button, clash ? { tone: 'danger' } : {}));
   return {
@@ -79,7 +79,7 @@ function withPromise(result, promise) {
     facts,
     reasons: clash ? [clash, ...result.reasons] : result.reasons,
     warnings: clash ? [clash, ...result.warnings] : result.warnings,
-    subject: { ...result.subject, promise: { ...promise, offer, clash: Boolean(clash) } },
+    subject: { ...result.subject, promise: { ...promise, offer: offers[0] || null, offers, clash: Boolean(clash) } },
   };
 }
 

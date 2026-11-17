@@ -53,6 +53,40 @@ famous symbol, sign-in messages for a different site, transfers measured
 against your balance, marketplace orders and batched calls — and it stays calm
 on ordinary requests.
 
+## What the button said, and what the request does
+
+Drainers rarely ask in so many words: the button says *Claim airdrop* or
+*Check eligibility*, and the request it sends gives someone the right to take
+your tokens. Guardian keeps the words of the button you pressed just before
+the request (a real click only; a click the page makes itself does not
+count), with the page's title and the nearest heading, and compares what they
+offer with what the request does (`src/analyzer/promise.js`).
+
+- **Code reads plain words** — claim, reward, eligibility, sign in, verify,
+  revoke, mint, swap, pay, stake, approve. The button shows among the facts
+  (*Button pressed*). Only a clear contradiction is a warning: a button that
+  offers to receive something, to sign in or to remove a permission, on a
+  request that takes assets out or grants a permission; or a mint, swap,
+  payment or stake that asks for every item in a collection. A button that
+  names more than one thing counts only if all of them contradict the request:
+  *Approve and claim* says it approves, so it is no warning. A contradiction
+  read by code makes the request *High risk*.
+- **Gemini reads the words code cannot** — *Continue*, *Получить бонус*,
+  *立即领取* — judging by the button's words, the page title and the heading,
+  not by the request. Its reading is used only when its whole form passed the
+  check, only to add a warning (in code's words, saying it is Gemini's
+  reading), never to change the risk level.
+
+Measured on 2026-11-17 with Gemini Nano in Chrome, on a small sample of 8
+unclear buttons in English, Russian and Chinese: 6 of 8 read exactly as meant
+(it took *Check eligibility* for a sign-in and *Join waitlist* for a mint);
+the warning decision was right on 8 of 8, with no false warning. Asked the
+same thing as part of a form that put the request first, it had read 2 of 7.
+
+On the demo page, **Write the button yourself** lets you type the button's
+words and choose what it really asks for: a hidden permission to take USDT,
+or a plain sign-in where nothing moves.
+
 ## How the hybrid AI is used
 
 Firebase AI Logic hybrid inference. Gemini reads every request Guardian can
@@ -156,7 +190,10 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
    log at the bottom says whether the demo wallet ever saw it.
 2. Press the other buttons: five things drainers ask for, and four ordinary
    requests that Guardian should not make a fuss about.
-3. Press **Turn Guardian off to see the difference** and click again: the
+3. In **Write the button yourself**, type any words for the button (try
+   *Continue* or *Approve and claim*) and choose what it really asks for: see
+   when Guardian says the button and the request do not match.
+4. Press **Turn Guardian off to see the difference** and click again: the
    same request goes straight to the wallet.
 
 Gemini's on-device reading needs a Chrome that has Gemini Nano (built-in
@@ -273,9 +310,13 @@ On-device by default. The cloud is contacted only after an explicit choice:
 the one-time permission for computers without Gemini Nano (switched off again
 in the toolbar panel; on the hosted demo it lasts for the visit), or the
 **Ask cloud AI** button. It receives the decoded facts of the request — the
-site, the action, the token, the amount, the other party's address — never
-the user's own address or balance. Guardian has no server of its own and keeps
-no history.
+site, the action, the token, the amount, the other party's address — and the
+words of the button the user pressed, with the page's title and the nearest
+heading. Those are the site's own words and can hold personal details (a
+page may greet the user by name); the permission and the button say so, and
+**Exactly what would be sent** shows them. Never the user's own address or
+balance, no form fields, no other page text. Guardian has no server of its
+own and keeps no history.
 
 To describe a request, Guardian reads public context through your wallet's
 own connection, the way the wallet itself would: whether the other party is a

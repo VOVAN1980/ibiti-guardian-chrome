@@ -492,11 +492,20 @@ test('what the button promised: code reads plain words, Gemini only the unclear 
     ['Send 0.01 ETH', 'pay'],
     ['Approve 25 USDC for a swap', 'swap'],
     ['Unlock NFT trading', 'approve'],
-    ['Check eligibility', null],
+    ['Check eligibility', 'receive'],
     ['Continue', null],
+    ['Get started', null],
   ]) {
     assert.equal(offerOf(button), offer, button);
   }
+  // A button that names more than one thing: a contradiction only if every one of them is.
+  const { offersOf } = await import('../src/analyzer/promise.js');
+  assert.deepEqual(offersOf('Approve and claim'), ['receive', 'approve']);
+  assert.equal(analyze({ ...RECORDS.limited, promise: press('Approve and claim') }).risk, 'info', 'it says it approves');
+  assert.equal(analyze({ ...RECORDS.limited, promise: press('Approve and claim') }).warnings.length, 0);
+  assert.equal(analyze({ ...RECORDS.limited, promise: press('Stake') }).warnings.length, 0);
+  assert.equal(analyze({ ...RECORDS.limited, promise: press('Claim and connect') }).warnings.length, 1, 'both offers contradict it');
+  assert.equal(analyze({ ...RECORDS.signin, promise: press('Check eligibility') }).warnings.length, 0, 'a sign-in moves nothing');
   // Clear contradictions only.
   const pressedOn = (name, button) => analyze({ ...RECORDS[name], promise: press(button) });
   const claim = pressedOn('limited', 'Claim airdrop');
@@ -511,9 +520,9 @@ test('what the button promised: code reads plain words, Gemini only the unclear 
   assert.equal(pressedOn('revoke', 'Revoke').warnings.length, 0);
   assert.equal(contradiction('receive', R.signin, 'Claim'), null, 'nothing moves in a sign-in');
   // Gemini: only where code could not read the button, and only to add a warning.
-  const unclear = pressedOn('claim', 'Check eligibility');
+  const unclear = pressedOn('claim', 'Continue');
   assert.equal(unclear.subject.promise.offer, null);
-  assert.match(geminiOffer(unclear, 'receive'), /^Gemini reads the button you pressed, “Check eligibility”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet\.$/);
+  assert.match(geminiOffer(unclear, 'receive'), /^Gemini reads the button you pressed, “Continue”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet\.$/);
   assert.equal(geminiOffer(unclear, 'approve'), null, 'no contradiction');
   assert.equal(geminiOffer(unclear, 'other'), null);
   assert.equal(geminiOffer(pressedOn('claim', 'Claim airdrop'), 'swap'), null, 'code read the button: Gemini is not asked to');

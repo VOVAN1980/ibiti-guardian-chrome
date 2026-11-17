@@ -192,7 +192,8 @@ function offerFallback(result, host, { afterNano = false } = {}) {
     $('local-fallback-note').textContent =
       'For the rest of this visit, Gemini in the cloud then reads the request through Firebase whenever this browser ' +
       'has no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. ' +
-      'Sends the decoded details below, never your wallet address.';
+      'Sends the decoded details below, and the words of the button you pressed with the page’s title and nearest ' +
+      'heading: the site’s words, which can hold personal details. Never your wallet address.';
   }
   showSent(cloudPrompt(result, host), false);
   $('local-fallback').hidden = false;
@@ -270,6 +271,21 @@ function cloudProblem(error) {
 // all-clear. Whether its reading matched the decoder is in the details.
 const WRITTEN_BY_GUARDIAN = 'Every word here is written by Guardian: Gemini answers a form, never text that is shown.';
 const differed = (problem) => problem.replace(/^a different reading of the request \((.*)\)$/, '$1');
+/**
+ * Says that an AI is reading, and for how long so far, once a second, until
+ * the returned function is called.
+ */
+function waiting(note, what) {
+  const since = performance.now();
+  const tick = () => {
+    const s = Math.floor((performance.now() - since) / 1000);
+    note.textContent = `${what}: ${s} s so far. You can decide without it.`;
+  };
+  tick();
+  const timer = setInterval(tick, 1000);
+  return () => clearInterval(timer);
+}
+
 /** What went wrong with a model's answer, after its name: "gave no usable answer", … */
 const failure = (problem) =>
   problem === 'no usable answer'
@@ -381,9 +397,12 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
   $('local-fallback').hidden = true;
   note.hidden = false;
   note.classList.add('pending');
-  note.textContent = deviceReady
-    ? 'Gemini Nano is reading this request on your computer…'
-    : 'Gemini is reading this request in the cloud…';
+  // While the AI reads, the window says how long it has taken so far: the
+  // facts and the buttons do not wait for it.
+  let stopWaiting = waiting(
+    note,
+    deviceReady ? 'Gemini Nano is reading this request on your computer' : 'Gemini is reading this request in the cloud',
+  );
 
   const toCloud = hybrid && !deviceReady;
   // With the permission on, the SDK decides where the answer is written, and
@@ -432,11 +451,13 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     // permission, Gemini in the cloud reads the request once more.
     if (verdict.checked !== 'passed' && out.source === 'on_device' && hybrid) {
       nano = { out, verdict };
-      note.textContent = 'Gemini Nano’s answer did not pass Guardian’s check. Asking Gemini in the cloud once, as you allowed…';
+      stopWaiting();
+      stopWaiting = waiting(note, 'Gemini Nano’s answer did not pass Guardian’s check. Gemini in the cloud is reading it once more, as you allowed');
       run = readInCloud(prompt, { signal: stop.signal });
       out = await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
       verdict = checkExplanation(out.text, result, { shown });
     }
+    stopWaiting();
     note.classList.remove('pending');
     setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
     const requests = cloudRequestsBetween(started, performance.now());
@@ -503,6 +524,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     }
     saveLastExplanation({ source: out.source, ms: out.ms, requests, checked: verdict.checked, retried: Boolean(nano) });
   } catch (error) {
+    stopWaiting();
     if (run) run.catch(() => {}); // a late failure after the time-out
     note.classList.remove('pending');
     note.classList.add('muted');
@@ -530,6 +552,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     saveLastExplanation({ source: toCloud ? 'in_cloud' : 'unknown', error: turnedOff ? 'turned off' : cloudProblem(error) });
     console.warn('[Guardian] explanation failed', error);
   } finally {
+    stopWaiting();
     stopListening();
     // The cloud stood in (or tried to) for a model this computer can still
     // download: keep offering it.
