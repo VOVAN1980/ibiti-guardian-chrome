@@ -43,19 +43,17 @@ const { lastExplanation: last } = await chrome.storage.local.get('lastExplanatio
 if (last && typeof last.at === 'number') {
   const s = (ms) => `${(ms / 1000).toFixed(1)} s`;
   const when = new Date(last.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const where = last.source === 'on_device' ? 'On device' : last.source === 'in_cloud' ? 'Cloud' : 'AI';
+  const where =
+    last.source === 'on_device' ? 'On device' : last.source === 'in_cloud' ? (last.retried ? 'Cloud, after Nano' : 'Cloud') : 'AI';
+  const requests = last.requests ?? '?';
   const parts = last.error
     ? [when, where, `no answer: ${last.error}`]
     : [
         when,
         where,
-        typeof last.ms === 'number' ? `answered in ${s(last.ms)}` : null,
-        `${last.requests ?? '?'} network requests from Guardian’s window`,
-        last.checked === 'withheld'
-          ? 'its answer was not used'
-          : last.checked === 'passed'
-            ? `its reading matched the decoder${last.retried ? ' (in the cloud, after Gemini Nano’s did not)' : ''}`
-            : null,
+        typeof last.ms === 'number' ? s(last.ms) : null,
+        `${requests} network request${requests === 1 ? '' : 's'}`,
+        last.checked === 'withheld' ? 'answer not used' : last.checked === 'passed' ? 'reading matched the decoder' : null,
       ];
   show('last', parts.filter(Boolean).join(' · '), !last.error && last.source === 'on_device' && last.requests === 0 ? 'ok' : 'off');
   $('last-row').hidden = false;
