@@ -19,6 +19,7 @@ import {
   wordToBigInt,
 } from './abi.js';
 import { PERMIT2, chainInfo, knownSpender, knownToken } from './registry.js';
+import { cleanPromise, contradiction, offerOf } from './promise.js';
 
 const SELECTOR = {
   approve: '0x095ea7b3',
@@ -53,8 +54,36 @@ export function maxRisk(a, b) {
  * @param {string} [req.origin] origin of the page that asked
  * @param {object} [req.enrich] on-chain reads made through the user's wallet:
  *   { token: {symbol, decimals}, spenderIsContract: boolean|null, accounts: string[] }
+ * @param {object} [req.promise] the button the user pressed just before the
+ *   request, as the in-page guard saw it: { button, title, heading, ageMs }
  */
 export function analyze(req) {
+  const result = decode(req);
+  // Every result lists its warnings, even when there are none.
+  return withPromise({ ...result, warnings: result.warnings || [] }, cleanPromise(req.promise));
+}
+
+/**
+ * The words of the button the user pressed, among the facts; a warning when
+ * what they offer plainly contradicts the request (src/analyzer/promise.js).
+ */
+function withPromise(result, promise) {
+  if (!promise) return result;
+  const offer = offerOf(promise.button);
+  const clash = contradiction(offer, result, promise.button);
+  const facts = [...result.facts];
+  facts.splice(1, 0, fact('Button pressed', promise.button, clash ? { tone: 'danger' } : {}));
+  return {
+    ...result,
+    risk: clash ? 'danger' : result.risk,
+    facts,
+    reasons: clash ? [clash, ...result.reasons] : result.reasons,
+    warnings: clash ? [clash, ...result.warnings] : result.warnings,
+    subject: { ...result.subject, promise: { ...promise, offer, clash: Boolean(clash) } },
+  };
+}
+
+function decode(req) {
   const ctx = {
     chainId: typeof req.chainId === 'number' ? req.chainId : null,
     origin: req.origin || '',

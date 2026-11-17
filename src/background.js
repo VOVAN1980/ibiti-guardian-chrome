@@ -38,6 +38,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
+/** The page's promise, kept short: the analyzer reads it as the site's words. */
+function promiseOf(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const text = (value) => (typeof value === 'string' ? value.slice(0, 200) : '');
+  return { button: text(raw.button), title: text(raw.title), heading: text(raw.heading), ageMs: Number(raw.ageMs) };
+}
+
 async function openReview(payload, sender) {
   if (!sender.tab || typeof sender.tab.id !== 'number') throw new Error('no tab');
   const id = crypto.randomUUID();
@@ -52,6 +59,8 @@ async function openReview(payload, sender) {
     params: payload.params,
     chainId: typeof payload.chainId === 'number' ? payload.chainId : null,
     enrich: payload.enrich && typeof payload.enrich === 'object' ? payload.enrich : {},
+    // The button the user pressed just before; the analyzer checks it again.
+    promise: promiseOf(payload.promise),
     createdAt: Date.now(),
   };
   await chrome.storage.session.set({ [reviewKey(id)]: record });

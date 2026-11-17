@@ -19,7 +19,7 @@ import {
 } from './ai/engine.js';
 import { codeSentence, isUndecoded, ownAddresses, scrubAddresses, scrubResult } from './ai/guard.js';
 import { deepPrompt, meaning, readingPrompt, shownReasons } from './ai/prompt.js';
-import { PATTERN_NOTE, checkAnalysis, checkExplanation, mostImportant } from './ai/reading.js';
+import { PATTERN_NOTE, checkAnalysis, checkExplanation, geminiOffer, mostImportant } from './ai/reading.js';
 import {
   allowCloudFallback,
   closeReview,
@@ -271,8 +271,11 @@ const differed = (problem) => problem.replace(/^a different reading of the reque
  * The reasons listed as most important: Guardian's warnings, always, then
  * the ones Gemini picked (the analyzer's own words, in Gemini's order).
  */
-function showImportant(result, top, where) {
+function showImportant(result, top, where, offerWarning = null) {
   const items = mostImportant(result, top);
+  // Gemini's reading of an unclear button: after Guardian's warnings, in
+  // code's words that say it is Gemini's reading.
+  if (offerWarning) items.splice(items.filter((i) => i.by === 'guardian').length, 0, { n: 0, text: offerWarning, by: 'gemini' });
   $('local-top').replaceChildren(
     ...items.map((item) => {
       const li = document.createElement('li');
@@ -284,7 +287,7 @@ function showImportant(result, top, where) {
   );
   $('local-important').hidden = items.length === 0;
   // The other reasons, once each: under "Why this matters".
-  const listed = new Set(items.map((i) => i.n));
+  const listed = new Set(items.map((i) => i.n).filter((n) => n > 0));
   const rest = result.reasons.map((text, i) => [i + 1, text]).filter(([n]) => !listed.has(n));
   $('reasons').replaceChildren(
     ...rest.map(([n, text]) => {
@@ -298,7 +301,7 @@ function showImportant(result, top, where) {
   const picked = items.some((i) => i.by === 'gemini');
   const warned = items.some((i) => i.by === 'guardian');
   $('local-picked').textContent = picked
-    ? `${warned ? 'Warnings marked ⚠ are always shown by Guardian; the others were' : 'These were'} picked from Guardian’s reasons by ${where}.`
+    ? `${warned ? 'Warnings marked ⚠ are always shown by Guardian; the others were' : 'These were'} chosen by ${where}, and written by Guardian.`
     : '';
   $('local-picked').hidden = !picked;
   document.body.dataset.top = top.join(',');
@@ -335,7 +338,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
   note.hidden = true;
   note.textContent = '';
   note.classList.remove('pending', 'muted');
-  for (const key of ['source', 'checked', 'withheld', 'withheldDetail', 'reading', 'stopped', 'localError', 'top', 'retried', 'nanoWithheld']) {
+  for (const key of ['source', 'checked', 'withheld', 'withheldDetail', 'reading', 'stopped', 'localError', 'top', 'retried', 'nanoWithheld', 'offer', 'offerWarning']) {
     delete document.body.dataset[key];
   }
 
@@ -430,7 +433,10 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     if (verdict.checked === 'passed') {
       note.hidden = true;
       note.textContent = '';
-      showImportant(result, verdict.top, model);
+      const offerWarning = geminiOffer(result, verdict.offer);
+      showImportant(result, verdict.top, model, offerWarning);
+      document.body.dataset.offer = verdict.offer || '';
+      if (offerWarning) document.body.dataset.offerWarning = '1';
       showCheck(
         $('local-check-box'),
         $('local-check'),

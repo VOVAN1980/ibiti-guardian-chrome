@@ -385,9 +385,12 @@ test('the whole check, as the window runs it', () => {
     checked: 'passed',
     words: 'a spending permission · someone else gains · out of your wallet · unlimited',
     top: [3, 1],
+    offer: null,
     problem: null,
     detail: '',
   });
+  assert.equal(run({ ...right, offer: 'receive' }).offer, 'receive');
+  assert.equal(run({ ...right, offer: 'made_up' }).offer, null);
   const swapped = run({ ...right, who_gains: 'you' });
   assert.equal(swapped.checked, 'withheld');
   assert.equal(swapped.words, '');
@@ -465,4 +468,54 @@ test('blind form sets: a wrong reading is never used, a right one is', () => {
     assert.deepEqual(wrong, []);
   }
   assert.ok(count > 300, `${count} answers`);
+});
+
+test('what the button promised: code reads plain words, Gemini only the unclear ones, and only adds a warning', async () => {
+  const { cleanPromise, offerOf, contradiction } = await import('../src/analyzer/promise.js');
+  const { geminiOffer } = await import('../src/ai/reading.js');
+  const press = (button, extra = {}) => ({ button, title: 'Rewards', heading: 'Claim your tokens', ageMs: 300, ...extra });
+  // Only a recent, plain press counts.
+  assert.equal(cleanPromise(null), null);
+  assert.equal(cleanPromise(press('')), null);
+  assert.equal(cleanPromise(press('Claim', { ageMs: 20000 })), null, 'too long before the request');
+  assert.equal(cleanPromise(press('x'.repeat(300))).button.length, 80);
+  assert.equal(cleanPromise(press('Claim' + String.fromCharCode(10) + 'now')).button, 'Claim now');
+  // What code reads from the words.
+  for (const [button, offer] of [
+    ['Claim airdrop', 'receive'],
+    ['Get your reward', 'receive'],
+    ['Connect wallet', 'sign_in'],
+    ['Verify ownership', 'sign_in'],
+    ['Revoke', 'revoke'],
+    ['Mint now', 'mint'],
+    ['Swap', 'swap'],
+    ['Send 0.01 ETH', 'pay'],
+    ['Approve 25 USDC for a swap', 'swap'],
+    ['Unlock NFT trading', 'approve'],
+    ['Check eligibility', null],
+    ['Continue', null],
+  ]) {
+    assert.equal(offerOf(button), offer, button);
+  }
+  // Clear contradictions only.
+  const pressedOn = (name, button) => analyze({ ...RECORDS[name], promise: press(button) });
+  const claim = pressedOn('limited', 'Claim airdrop');
+  assert.equal(claim.risk, 'danger', 'a claim that gives a permission is high risk');
+  assert.equal(claim.facts[1].label, 'Button pressed');
+  assert.match(claim.warnings[0], /^The button you pressed said “Claim airdrop”, an offer to receive something, but this request gives someone permission to take USDC out of your wallet\.$/);
+  assert.equal(pressedOn('limited', 'Approve 25 USDC for a swap').risk, 'info', 'an honest button changes nothing');
+  assert.equal(pressedOn('signin', 'Sign in').warnings.length, 0);
+  assert.match(pressedOn('transfer', 'Sign in').warnings[0], /an offer to sign in or verify the wallet, but this request sends 0\.01 ETH out of your wallet/);
+  assert.match(pressedOn('nft', 'Mint now').warnings[0], /an offer to mint, but this request gives someone access to every item you own in a collection/);
+  assert.match(pressedOn('permitBatch', 'Revoke').warnings[0], /an offer to remove a permission/);
+  assert.equal(pressedOn('revoke', 'Revoke').warnings.length, 0);
+  assert.equal(contradiction('receive', R.signin, 'Claim'), null, 'nothing moves in a sign-in');
+  // Gemini: only where code could not read the button, and only to add a warning.
+  const unclear = pressedOn('claim', 'Check eligibility');
+  assert.equal(unclear.subject.promise.offer, null);
+  assert.match(geminiOffer(unclear, 'receive'), /^Gemini reads the button you pressed, “Check eligibility”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet\.$/);
+  assert.equal(geminiOffer(unclear, 'approve'), null, 'no contradiction');
+  assert.equal(geminiOffer(unclear, 'other'), null);
+  assert.equal(geminiOffer(pressedOn('claim', 'Claim airdrop'), 'swap'), null, 'code read the button: Gemini is not asked to');
+  assert.equal(geminiOffer(R.claim, 'receive'), null, 'no button pressed');
 });

@@ -22,6 +22,7 @@
 // things to check, each picked from a fixed list written here. Code checks
 // that the request has what the pattern and each check are about.
 
+import { OFFERS, OFFER_KINDS, contradiction, quote, whatItDoes } from '../analyzer/promise.js';
 import { isUndecoded } from './guard.js';
 
 export const ACTIONS = [
@@ -45,14 +46,20 @@ const READING_PROPERTIES = {
   limit: { type: 'string', enum: LIMITS },
 };
 
+// What the button the user pressed offered, as Gemini reads it: used only
+// where code cannot read the button's words itself, and only to add a
+// warning, never to remove one.
+export const OFFER_VALUES = [...OFFER_KINDS, 'other', 'no_button'];
+
 /** The short explanation's form, as JSON Schema: on the device and in the cloud alike. */
 export const READING_SCHEMA = {
   type: 'object',
   properties: {
     ...READING_PROPERTIES,
     reasons: { type: 'array', items: { type: 'integer' }, maxItems: 2 },
+    offer: { type: 'string', enum: OFFER_VALUES },
   },
-  required: ['action', 'who_gains', 'direction', 'limit', 'reasons'],
+  required: ['action', 'who_gains', 'direction', 'limit', 'reasons', 'offer'],
   additionalProperties: false,
 };
 
@@ -296,6 +303,8 @@ export const READING_GUIDE = [
 ].join('\n');
 export const REASONS_GUIDE =
   '- reasons: the numbers of the one or two most important lines under "Why it matters", most important first.';
+export const OFFER_GUIDE =
+  '- offer: what the button the user pressed offered, judging by its words, the page title and the heading: receive (a claim, reward, airdrop, bonus), sign_in (sign in, connect, verify), revoke, mint, swap, pay, stake, approve (approve, list, unlock); other if none of these; no_button if no button is given.';
 export const PATTERN_GUIDE = `- pattern: a known wallet-scam pattern this request has the shape of (${Object.keys(PATTERNS)
   .filter(KNOWN)
   .join(', ')}); no_known_pattern if it matches none (that does not make it safe); cannot_determine if the facts are not enough to tell.`;
@@ -430,7 +439,26 @@ export function checkExplanation(text, result, { shown = null } = {}) {
       detail: mismatchDetail(reading.mismatches),
     };
   }
-  return { checked: 'passed', words: readingWords(answer), top: reading.top, problem: null, detail: '' };
+  return {
+    checked: 'passed',
+    words: readingWords(answer),
+    top: reading.top,
+    offer: OFFER_VALUES.includes(answer.offer) ? answer.offer : null,
+    problem: null,
+    detail: '',
+  };
+}
+
+/**
+ * Gemini's reading of an unclear button, against the decoded request. Only
+ * where code could not read the button's words; only a clear contradiction;
+ * in code's words, saying it is Gemini's reading. Null otherwise.
+ */
+export function geminiOffer(result, offer) {
+  const promise = (result.subject || {}).promise;
+  if (!promise || promise.offer || !OFFER_KINDS.includes(offer)) return null;
+  if (!contradiction(offer, result, promise.button)) return null;
+  return `Gemini reads the button you pressed, ${quote(promise.button)}, as an offer to ${OFFERS[offer].label}, but this request ${whatItDoes(result)}.`;
 }
 
 /**

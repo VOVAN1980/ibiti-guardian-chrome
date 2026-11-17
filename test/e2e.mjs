@@ -553,18 +553,19 @@ await step('a request Guardian cannot decode is not explained by any AI, even wi
 // when its reading of the request matches the decoder, and nothing Gemini
 // writes is ever shown as text. The model here is a stand-in that answers
 // what each case needs, so every outcome is checked, every time.
-// (The claim's reasons: 1 any amount, 2 personal wallet — both warnings —
-// 3 unknown spender, 4 lasts until revoked.)
+// (The claim's reasons: 1 the button said "Claim airdrop", 2 any amount,
+// 3 personal wallet — all three warnings — 4 unknown spender, 5 lasts until
+// revoked.)
 const RIGHT = {
   action: 'spending_permission',
   who_gains: 'another_party',
   direction: 'out_of_your_wallet',
   limit: 'unlimited',
-  reasons: [3, 4],
+  reasons: [4, 5],
 };
 const NANO_CASES = {
   'a right reading: its picks are added after Guardian’s warnings': JSON.stringify(RIGHT),
-  'it picks no warning: the warnings are still shown, first': JSON.stringify({ ...RIGHT, reasons: [4] }),
+  'it picks no warning: the warnings are still shown, first': JSON.stringify({ ...RIGHT, reasons: [5] }),
   'who gains swapped: nothing from it is used': JSON.stringify({ ...RIGHT, who_gains: 'you' }),
   'direction swapped: nothing from it is used': JSON.stringify({ ...RIGHT, direction: 'into_your_wallet' }),
   'words of its own: never shown': JSON.stringify({ ...RIGHT, note: 'This request is safe to confirm.' }),
@@ -620,7 +621,7 @@ for (const [name, answer] of Object.entries(NANO_CASES)) {
       assert.deepEqual(calls, [], 'nothing left the computer');
       // The code's sentence and the warnings, whatever the model said.
       assert.match(out.text, /^If you confirm, someone else, an unknown address \(a personal wallet\), gets permission to take any amount of USDT/);
-      assert.deepEqual(out.important.slice(0, 2), ['1:guardian', '2:guardian']);
+      assert.deepEqual(out.important.slice(0, 3), ['1:guardian', '2:guardian', '3:guardian']);
       // The main view never says Gemini "agrees": that could read as an all-clear.
       assert.doesNotMatch(out.main, /agree|approved|✓/i);
       assert.equal(out.checkOpen, false, 'the details stay closed');
@@ -634,16 +635,16 @@ for (const [name, answer] of Object.entries(NANO_CASES)) {
       assert.ok(!out.nano[0].contents.toLowerCase().includes('1111111111111111111111111111111111111111'), 'not the user’s address');
       if (name.startsWith('a right reading') || name.startsWith('words of its own')) {
         assert.equal(out.checked, 'passed');
-        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:gemini', '4:gemini']);
-        assert.match(out.picked, /picked from Guardian’s reasons by Gemini Nano on your computer/);
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:guardian', '4:gemini', '5:gemini']);
+        assert.match(out.picked, /chosen by Gemini Nano on your computer, and written by Guardian/);
         assert.match(out.check, /matched Guardian’s decoder: a spending permission · someone else gains · out of your wallet · unlimited/);
         assert.equal(out.note, null);
       } else if (name.startsWith('it picks no warning')) {
         assert.equal(out.checked, 'passed');
-        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '4:gemini']);
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:guardian', '5:gemini']);
       } else {
         assert.equal(out.checked, 'withheld');
-        assert.deepEqual(out.important, ['1:guardian', '2:guardian'], 'only Guardian’s warnings');
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:guardian'], 'only Guardian’s warnings');
         assert.equal(out.picked, null);
         assert.match(out.note, /Gemini’s answer was not used this time/);
         assert.match(out.check, name.startsWith('plain text') ? /no usable answer/ : /differently from Guardian’s decoder \((who gains|which way assets move)\)/);
@@ -739,14 +740,14 @@ for (const allowed of [true, false]) {
           assert.equal(out.source, 'in_cloud');
           assert.equal(out.checked, 'passed');
           assert.match(out.chip, /^Cloud fallback · \d/);
-          assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:gemini', '4:gemini']);
+          assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:guardian', '4:gemini', '5:gemini']);
           assert.match(out.check, /^Gemini Nano on your computer read the request differently from Guardian’s decoder \(who gains\), so Gemini in the cloud read it once more, as you allowed\./);
           assert.match(out.meta, /as you allowed\. Your wallet address was not sent\./);
         } else {
           // Not used, nothing sent; the permission is offered, saying what it covers.
           assert.deepEqual(sent, [], 'nothing was sent');
           assert.equal(out.checked, 'withheld');
-          assert.deepEqual(out.important, ['1:guardian', '2:guardian']);
+          assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:guardian']);
           assert.equal(out.offer, true);
           assert.equal(out.button, 'Allow cloud AI as a fallback');
           assert.match(out.consent, /once more whenever Gemini Nano’s answer does not pass Guardian’s check/);
@@ -773,6 +774,115 @@ for (const allowed of [true, false]) {
     },
   );
 }
+
+// The button the user pressed, against the request it sent. Code reads plain
+// words; a click the page fakes does not count; Gemini reads an unclear
+// button, and its reading only adds a warning.
+const promiseView = (review) =>
+  review.evaluate(() => ({
+    badge: document.getElementById('badge').textContent,
+    button: (() => {
+      const row = [...document.querySelectorAll('.fact')].find((r) => r.querySelector('dt').textContent === 'Button pressed');
+      return row ? row.querySelector('dd').textContent : null;
+    })(),
+    important: [...document.querySelectorAll('#local-top li')].map((li) => `${li.dataset.by}: ${li.textContent}`),
+  }));
+
+await step('the button the user pressed is compared with what the request does', async () => {
+  // "Claim airdrop" sends an unlimited approval: code's warning, first.
+  const claim = await reviewWithCalls('claim');
+  try {
+    await claim.review.waitForFunction(() => document.body.dataset.local !== undefined);
+    const out = await promiseView(claim.review);
+    assert.equal(out.button, 'Claim airdrop');
+    assert.match(out.important[0], /^guardian: The button you pressed said “Claim airdrop”, an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet\.$/);
+  } finally {
+    await rejectAndWait(claim.review);
+  }
+  // An honest button: no warning about it.
+  const swap = await reviewWithCalls('limited');
+  try {
+    await swap.review.waitForFunction(() => document.body.dataset.local !== undefined);
+    const out = await promiseView(swap.review);
+    assert.equal(out.button, 'Approve 25 USDC for a swap');
+    assert.equal(out.badge, 'No red flags found');
+    assert.ok(!out.important.some((i) => /button you pressed/.test(i)));
+  } finally {
+    await rejectAndWait(swap.review);
+  }
+  // A click the page makes itself does not count as the user's.
+  const before = new Set(browser.targets());
+  await page.bringToFront();
+  await page.evaluate(() => document.querySelector('[data-scenario="nft"]').click());
+  const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
+  const faked = await target.asPage();
+  try {
+    await faked.waitForFunction(() => document.body.dataset.local !== undefined);
+    const out = await promiseView(faked);
+    // (The last real press, on "Approve 25 USDC for a swap", was over 15 s ago or earlier: either way not this one.)
+    assert.notEqual(out.button, 'Unlock NFT trading', 'the page’s own click is not taken as the user’s');
+  } finally {
+    await rejectAndWait(faked);
+  }
+});
+
+await step('an unclear button: Gemini reads it, and its reading can only add a warning', async () => {
+  // A button whose words code does not read, sending an unlimited approval.
+  await page.bringToFront();
+  await page.evaluate(() => {
+    const button = document.createElement('button');
+    button.id = 'eligibility';
+    button.textContent = 'Check eligibility';
+    button.onclick = async () => {
+      const [from] = await window.ethereum.request({ method: 'eth_accounts' });
+      const spender = '9f3a00000000000000000000000000000000c21e'.padStart(64, '0');
+      await window.ethereum
+        .request({
+          method: 'eth_sendTransaction',
+          params: [{ from, to: '0xdAC17F958D2ee523a2206206994597C13D831ec7', data: `0x095ea7b3${spender}${'f'.repeat(64)}` }],
+        })
+        .then(
+          (result) => window.__dapp.history.push({ ok: true, result }),
+          (error) => window.__dapp.history.push({ ok: false, code: error.code }),
+        );
+    };
+    document.body.prepend(button);
+  });
+  for (const offer of ['receive', 'other']) {
+    const before = new Set(browser.targets());
+    await page.click('#eligibility');
+    const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
+    const first = await target.asPage();
+    let tab = null;
+    try {
+      await first.waitForFunction(() => document.body.dataset.local !== undefined);
+      const plain = await promiseView(first);
+      assert.equal(plain.button, 'Check eligibility');
+      assert.ok(!plain.important.some((i) => /button you pressed/.test(i)), 'code does not read these words');
+      tab = await browser.newPage();
+      await tab.evaluateOnNewDocument(fakeNano, JSON.stringify({ ...RIGHT, offer }));
+      tab.goto(first.url()).catch(() => {});
+      await tab.waitForFunction(() => document.body.dataset.local === 'done', { timeout: 20000, polling: 200 });
+      const out = await promiseView(tab);
+      const nanoPrompt = await tab.evaluate(() => window.__nano[0]);
+      assert.match(nanoPrompt, /Button pressed: \\"Check eligibility\\"/, 'Gemini was given the button’s words, as the site’s');
+      if (offer === 'receive') {
+        assert.ok(
+          out.important.includes('gemini: Gemini reads the button you pressed, “Check eligibility”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet.'),
+          out.important.join(' | '),
+        );
+        assert.equal(await tab.evaluate(() => document.body.dataset.offerWarning), '1');
+      } else {
+        assert.ok(!out.important.some((i) => /button you pressed/.test(i)));
+      }
+      assert.equal(out.badge, plain.badge, 'Gemini never changes the risk level');
+    } finally {
+      if (tab) await tab.close().catch(() => {});
+      await rejectAndWait(first);
+    }
+  }
+  await page.evaluate(() => document.getElementById('eligibility').remove());
+});
 
 // However the AI service fails, the facts are there at once and Reject and
 // Continue keep working: the AI is never in the way of the decision.

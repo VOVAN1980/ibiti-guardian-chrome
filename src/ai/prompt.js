@@ -8,7 +8,7 @@
 // Prompts never hold the user's own address: the review window removes it
 // from the result before a prompt is built (src/ai/guard.js scrubResult).
 
-import { CHECKS_GUIDE, PATTERN_GUIDE, READING_GUIDE, REASONS_GUIDE } from './reading.js';
+import { CHECKS_GUIDE, OFFER_GUIDE, PATTERN_GUIDE, READING_GUIDE, REASONS_GUIDE } from './reading.js';
 
 // "All of your ETH", "about 40% of your USDT", "This would send all of the ETH
 // in this wallet": how much of the user's balance a payment takes. Useful on
@@ -20,7 +20,7 @@ const BALANCE_NOTE = / of your /;
 // name, a sign-in domain, a method name, an unverified token's symbol. They go
 // into prompts quoted and short, marked as the site's words, so they cannot
 // pose as instructions.
-const SITE_WORDS = new Set(['App', 'Type', 'Sign-in for', 'Method']);
+const SITE_WORDS = new Set(['App', 'Type', 'Sign-in for', 'Method', 'Button pressed']);
 // Raw data nobody can read; the model gets nothing from it.
 const NOT_FOR_AI = new Set(['Data']);
 
@@ -165,12 +165,17 @@ function assessment(result, cloud) {
  */
 function requestLines(result, cloud) {
   const why = reasonLines(result, { cloud });
+  const promise = (result.subject || {}).promise;
   return [
     `Request: ${line(result.headline, 120)}`,
     assessment(result, cloud),
     'Facts:',
     factLines(result, { cloud }),
     why ? `Why it matters:\n${why}` : null,
+    // The page around the button the user pressed (the site's own words).
+    promise
+      ? `The page: title ${quoted(promise.title || '(none)', 80)}, heading near the button ${quoted(promise.heading || '(none)', 80)}.`
+      : 'No button was pressed just before this request.',
   ];
 }
 
@@ -187,6 +192,7 @@ export function readingPrompt(result, host, { cloud = false } = {}) {
     'Read the facts and answer in JSON with these fields:',
     READING_GUIDE,
     hasReasons ? REASONS_GUIDE : '- reasons: an empty list.',
+    OFFER_GUIDE,
     SITE_WORDS_RULE,
     '',
     ...requestLines(result, cloud),
