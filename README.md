@@ -32,13 +32,16 @@ Built for #BuildHybridAI 2026.
    network), how much, to whom, on which network, and why it matters. The risk
    level — *High risk*, *Check carefully*, *No red flags found* — is decided by
    code, never by a model.
-3. **Gemini explains it, on your device.** Gemini Nano turns the facts into
-   two plain sentences on your own computer. No AI service is contacted. On a
-   computer without Gemini Nano, a one-time permission lets Gemini in the
-   cloud explain instead (Firebase AI Logic's hybrid fallback).
+3. **Gemini reads it too, on your device.** One sentence on what confirming
+   does is written by code. Gemini Nano reads the same request on your own
+   computer and answers a short form; code checks its reading against the
+   decoded request and only then shows its plain-words note. No AI service is
+   contacted. On a computer without Gemini Nano, a one-time permission lets
+   Gemini in the cloud do it instead (Firebase AI Logic's hybrid fallback).
 4. **A deeper look, only if you ask.** One button sends the decoded facts
    (never your own wallet address) to Gemini in the cloud for a structured
-   second opinion.
+   second opinion: the scam pattern it matches, from a fixed list that code
+   checks, and what to verify.
 5. **You decide.** *Reject* returns the standard error 4001 to the site and
    the wallet never sees the request. *Continue* forwards exactly the request
    that was reviewed.
@@ -51,66 +54,83 @@ on ordinary requests.
 
 ## How the hybrid AI is used
 
-Firebase AI Logic hybrid inference. The short explanation runs on the
-computer whenever Gemini Nano is there; once the user has allowed the cloud,
-the SDK falls back to Gemini in the cloud on computers without it.
+Firebase AI Logic hybrid inference. Gemini reads every request Guardian can
+decode, on the computer whenever Gemini Nano is there; once the user has
+allowed the cloud, the SDK falls back to Gemini in the cloud on computers
+without it.
 
-| | Plain-words explanation | Plain-words explanation, cloud allowed | Deeper analysis |
+| | Gemini's reading | Gemini's reading, cloud allowed | Deeper analysis |
 |---|---|---|---|
-| Mode | `ONLY_ON_DEVICE`, streaming | `PREFER_ON_DEVICE`, streaming | `ONLY_IN_CLOUD`, JSON schema |
+| Mode | `ONLY_ON_DEVICE` | `PREFER_ON_DEVICE` | `ONLY_IN_CLOUD` |
+| Answer | A JSON form (Prompt API `responseConstraint`) | The same form (`responseConstraint` on device, `responseJsonSchema` in the cloud) | A JSON form (`responseJsonSchema`) |
 | Model | Gemini Nano, built into Chrome | Gemini Nano if ready, else `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` |
 | When | By itself (the default) | By itself, after a one-time **Use cloud AI when this computer has none** | Only after the user presses **Ask cloud AI** |
 | Sent to an AI service | Nothing | Nothing when Nano answers; otherwise the decoded facts | The decoded facts |
 | Protected by | — (no network call) | Firebase App Check | Firebase App Check |
+
+**Who writes what.** The part that decides — who would get which permission,
+how much of which token, for how long, where funds go — is never written by
+a model:
+
+- **Code** (`src/analyzer/`, `src/ai/prompt.js`) writes the facts, the risk
+  level and one sentence on what confirming does, for example: *If you
+  confirm, someone else, an unknown address (a personal wallet), gets
+  permission to take any amount of USDT out of your wallet, at any time,
+  without asking you again, until you revoke it.* It is on screen at once,
+  with or without AI.
+- **Gemini** reads the same facts and answers a form (`src/ai/reading.js`):
+  what kind of request it is, who would gain, which way the user's assets
+  would move, whether it is unlimited, which of the reasons matter most, and
+  a note of one or two sentences on why it matters, in plain words.
+- **Code checks the form against the decoded request.** If any field is
+  wrong — "you" gain where someone else does, assets "come in" where they go
+  out, "limited" where it is unlimited — nothing from Gemini is shown, and the
+  window says which part differed. A swap of roles or direction is a wrong
+  value in a field, so it is caught however the model would have worded it.
+  When the reading matches, the reasons Gemini picked are marked in the list.
+- **Gemini's note names nothing**: no token, amount, number, address, site or
+  network. Names come from code only. The note is also checked for the claims
+  code can recognise (`src/ai/guard.js`): that the request is safe, harmless
+  or normal; "verified"; "unlimited" or "all your tokens" beyond what the
+  request covers; "you get the permission", "the funds come to you". If it
+  fails, the note is not shown and the window says why, without repeating it.
+- **The deeper analysis** answers the same reading, plus a scam pattern from
+  a fixed list (approval phishing, permit phishing, collection approval
+  phishing, fake token, sign-in phishing, marketplace order, a risky action in
+  a batch), a one-sentence summary and things to check. Code checks that the
+  request has the shape of the pattern it names — "permit phishing" only on a
+  permit signature, never a known scam on a request with no red flags — and
+  writes the label itself. All of it is shown, or none of it.
+
+What this does not do: Gemini's note is still free text. A misleading note in
+words the checks do not recognise can pass; that is why the sentence that
+matters is written by code, and why the measured numbers below say what was
+measured.
 
 - The permission is off until the user turns it on, in Guardian's window or
   its toolbar panel (where it can be turned off again). The hosted demo keeps
   it for the visit only.
 - **Exactly what would be sent** shows the full text next to the one-time
   permission, and **Exactly what was sent** after every cloud answer. It
-  never holds the user's wallet address or balance. (For a payment, the risk
-  level that goes with the facts can still hint that it takes most of the
-  balance: the explanation must not contradict the window.)
-- Each answer shows where it ran and how long it took (*On device · 12.0 s*,
-  *Cloud fallback · 1.6 s*, *Cloud · 3.8 s*), from the SDK's
+  never holds the user's wallet address or balance; for a payment measured
+  against the balance, the risk level stays on the computer too.
+- Each answer shows where it ran and how long it took (*On device · 3.0 s*,
+  *Cloud fallback · 1.6 s*, *Cloud · 2.3 s*), from the SDK's
   `inferenceSource`.
 - The SDK falls back when no on-device model is ready (including one that
   still needs downloading; the window then also offers the download). If
-  Gemini Nano is there but fails while answering, there is no explanation
-  that time; the facts and the decision never depend on it.
-- Prompts are built only from the analyzer's facts, plus one exact sentence,
-  written by code, on who would be allowed to do what — small models tend to
-  swap the roles in an approval (`src/ai/prompt.js`).
-- The model explains; it never decides what the request is or how risky it is.
-- **Checked before it is shown** (`src/ai/guard.js`). Each sentence appears
-  only after code has checked these things against the request:
-  - addresses: each one is an address of this request;
-  - amounts: each one goes with its own token (*0.01 ETH* passes only where
-    the request moves 0.01 ETH); other numbers, percentages and token names
-    must be in the facts;
-  - *unlimited* or *everything* only where the facts say so;
-  - roles: not "you get the permission" or "the funds come to you" where the
-    other party gets them;
-  - no wording that calls the request safe, harmless or normal (Guardian
-    never calls a request safe).
-
-  The answer stops at the first sentence that fails; if nothing passed, the
-  window shows a sentence written by code and says what was wrong, without
-  repeating it. These checks catch these classes of mistakes only. An
-  explanation can still be vague, incomplete or misleading in ways code
-  cannot detect; the facts and the risk level next to it are what Guardian
-  stands behind. 381 recorded real Gemini answers pass
-  (`test/fixtures/real-answers.json`); deliberately wrong ones are caught
-  (`test/guard.test.js`).
+  Gemini Nano is there but fails while answering, there is no note that
+  time; the facts and the decision never depend on it.
 - **No guessing.** A request the analyzer cannot decode (a blind signature,
-  an unknown contract call or data format) gets no AI explanation at all.
+  an unknown contract call or data format, a batch with such a call) gets no
+  AI at all: a model could only guess.
 - Text a website writes itself (an app name, a sign-in domain) goes into
   prompts quoted and short, as data; an unverified token's symbol is kept
   only if it is a plain ticker.
 - No Gemini API key is in the extension. Firebase AI Logic is the gateway
   (`src/ai/engine.js`).
 - If no AI answers at all (no on-device model and no permission for the
-  cloud), the facts and the decision still work.
+  cloud), the facts, the code's sentence and the decision still work.
 
 ## Try it in two minutes
 
@@ -189,10 +209,19 @@ npm test             # analyzer: decoding and risk rules; what prompts may send 
 npm run test:e2e     # real Chrome: the extension, then the no-install site
 ```
 
+`npm test` also checks Gemini's part (`test/reading.test.js`): every wrong
+value of every field is caught for every kind of request; real Gemini answers
+recorded live (`test/fixtures/real-forms.json`) get the verdict they deserve;
+and blind sets of right and wrong answers, written by an author who never saw
+the checks, stay caught (`test/fixtures/forms-set-*.json`).
+
 The end-to-end tests check that a held request does not reach the wallet,
 that Reject returns error 4001, that Continue forwards the request byte for
 byte, that closing the window or losing contact with the extension refuses
 the request, and that nothing is sent to the cloud before the user asks.
+With a stand-in for Gemini Nano they check what the window shows for a right
+reading, a swapped role, a swapped direction, a note that names a token, a
+note that calls the request safe, and an answer that is not the form.
 They also check the unfriendly cases: a wallet that replaces its own
 `request()` after start-up stays guarded (`test/swap.mjs`), and a page cannot
 change a request while it is being reviewed, hide the method behind a getter,

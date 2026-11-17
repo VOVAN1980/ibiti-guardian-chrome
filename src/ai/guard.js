@@ -216,7 +216,7 @@ const DOMAIN =
 
 // Networks an answer might name. "Your Ethereum account" is how any EVM
 // wallet is called; "Base" is a network only as "on Base" or "Base network".
-const NETWORKS = [
+export const NETWORKS = [
   ['ethereum', /\bEthereum\b(?!\s+(?:account|wallet|address|key|signature|apps?|users?))/],
   ['bnb chain', /\b(?:BNB (?:Smart )?Chain|Binance Smart Chain|BSC)\b/],
   ['polygon', /\bPolygon\b/],
@@ -251,7 +251,7 @@ const NOT_A_NAME = /^(?:the|this|that|a|an|same|another|different|other|its|thei
 
 // Marketplaces, exchanges and protocols an answer might name as the app or
 // the other party. Only the ones in the facts may be named.
-const BRANDS =
+export const BRANDS =
   /\b(?:OpenSea|Blur|LooksRare|X2Y2|Rarible|Magic Eden|Seaport|Uniswap|SushiSwap|PancakeSwap|1inch|Curve|Balancer|Aave|Compound|Lido|MakerDAO|Coinbase|Kraken|OKX|Bybit|Permit2|Universal Router|SwapRouter|Swap Router|Binance(?!\s+Smart Chain))\b/g;
 
 // "the spender 0x…", "the collection 0x…": the address must be the one that
@@ -290,7 +290,7 @@ const AS_ORDINARY =
 // transfer, but …" does claim, and is not excused.)
 const CONTRAST =
   /\b(?:(?:may|might|can|could)\s+)?(?:looks?|seems?|appears?|sounds?)\s+(?:like\s+|to be\s+)?(?:(?:a|an)\s+)?(?:\w+\s+){0,2}?(?:safe|harmless|simple|innocent|legitimate|common|standard|normal|ordinary|routine|typical|regular|usual)\b[^.;]*?,?\s*(?:but|however|yet)\b/gi;
-const NEGATED = /\b(?:not|never|no|nothing|none|nobody|cannot|can't|can not|isn't|aren't|won't|don't|doesn't|unable|nor|hardly|neither)\b|n't\b/i;
+export const NEGATED = /\b(?:not|never|no|nothing|none|nobody|cannot|can't|can not|isn't|aren't|won't|don't|doesn't|unable|nor|hardly|neither)\b|n't\b/i;
 // "Verify that the spender is a legitimate service", "only continue if you
 // are sure it is legitimate": advice to check, not a claim. A plain "if" is
 // not enough: "If you confirm, it is safe" is a claim.
