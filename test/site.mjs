@@ -229,7 +229,8 @@ for (const [scenario, expected] of Object.entries(expectations)) {
       badge: document.getElementById('badge').textContent,
       headline: document.getElementById('headline').textContent,
       facts: document.querySelectorAll('#facts .fact').length,
-      reasons: document.getElementById('why').hidden ? 0 : document.querySelectorAll('#reasons li').length,
+      // The warnings at the top and the rest under "Why this matters".
+      reasons: document.querySelectorAll('#local-top li, #reasons li').length,
       overflow: document.documentElement.scrollWidth - innerWidth,
     }));
     assert.equal(shown.badge, expected.risk);

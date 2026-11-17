@@ -30,6 +30,15 @@ const SELECTOR = {
 };
 
 const RISK_ORDER = { info: 0, caution: 1, danger: 2 };
+
+// A result's `warnings` are the reasons Guardian always shows first, with or
+// without AI: each of them alone is enough to make a request high risk (or
+// sends coins the user may not expect). An AI may add emphasis to other
+// reasons; it can never hide these.
+const BLIND_SIGN =
+  'This method signs data you cannot read. The signature can authorize any transaction from your wallet.';
+const PERSONAL_WALLET =
+  'The spender is a personal wallet, not a contract. Real apps ask you to approve their contract, almost never a person.';
 const STABLE_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'FDUSD', 'TUSD']);
 
 export function maxRisk(a, b) {
@@ -77,10 +86,8 @@ export function analyze(req) {
           fact('Action', 'Sign raw data (eth_sign)'),
           fact('Data', String(params[1] ?? ''), { mono: true }),
         ],
-        reasons: [
-          'This method signs data you cannot read. The signature can authorize any transaction from your wallet.',
-          'Legitimate apps no longer use it; most wallets disable it by default.',
-        ],
+        reasons: [BLIND_SIGN, 'Legitimate apps no longer use it; most wallets disable it by default.'],
+        warnings: [BLIND_SIGN],
         subject: { action: 'eth_sign' },
       };
     default:
@@ -138,6 +145,7 @@ function analyzeTransaction(tx, ctx) {
       'Guardian cannot tell what this call does, so it cannot confirm it is safe.',
       ...(value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : []),
     ],
+    warnings: value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : [],
     subject: { action: 'contractCall', contract: to, selector, value: value.toString() },
   };
 }
@@ -200,14 +208,13 @@ function decodeCall(selector, to, data, ctx) {
  */
 function withCoins(result, value, chain, contract) {
   const coins = `${formatUnits(value, 18)} ${chain.native}`;
+  const reason = `It also sends ${coins} to the contract it calls. This kind of request never needs coins attached.`;
   return {
     ...result,
     risk: 'danger',
     facts: [...result.facts, fact('Also sends', coins, { tone: 'danger' })],
-    reasons: [
-      `It also sends ${coins} to the contract it calls. This kind of request never needs coins attached.`,
-      ...result.reasons,
-    ],
+    reasons: [reason, ...result.reasons],
+    warnings: [reason, ...(result.warnings || [])],
     subject: { ...result.subject, coins, contract },
   };
 }
@@ -272,6 +279,7 @@ function nativeTransfer(to, value, chain, ctx) {
       ...judged.reasons,
       'This sends coins straight to the address above. A confirmed transfer cannot be undone.',
     ],
+    warnings: judged.reasons,
     // Reasons that come from the user's balance; kept out of cloud prompts.
     balanceReasons: judged.reasons,
     subject: { action: 'nativeTransfer', to, amount, shareOfBalance: judged.note, toSelf },
@@ -322,10 +330,8 @@ function spenderFacts(spender, ctx, reasons) {
   }
   if (ctx.enrich.spenderIsContract === false) {
     risk = 'danger';
-    reasons.push(
-      'The spender is a personal wallet, not a contract. Real apps ask you to approve their contract, almost never a person.',
-    );
-    return { risk, known: null, value: spender, note: 'personal wallet' };
+    reasons.push(PERSONAL_WALLET);
+    return { risk, known: null, value: spender, note: 'personal wallet', warning: PERSONAL_WALLET };
   }
   return { risk, known: null, value: spender };
 }
@@ -411,8 +417,12 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt, expires 
   } else {
     reasons.unshift(`The spender could move ${what} from your wallet without asking again.`);
   }
+  const warnings = sp.warning ? [sp.warning] : [];
   if (amt.unlimited) {
-    if (!sp.known) risk = 'danger';
+    if (!sp.known) {
+      risk = 'danger';
+      warnings.unshift(reasons[0]); // any amount, to someone Guardian does not know
+    }
   } else if (sp.known && sp.risk === 'info') {
     // Bounded amount to a widely used protocol: the ordinary first step of a swap.
     risk = 'info';
@@ -420,9 +430,9 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt, expires 
   if (!sp.known) reasons.push('Guardian does not recognise the spender address.');
   if (tok.impersonates) {
     risk = 'danger';
-    reasons.push(
-      `This token calls itself ${tok.symbol}, but its contract is not the real ${tok.symbol} on ${chain.name}.`,
-    );
+    const fake = `This token calls itself ${tok.symbol}, but its contract is not the real ${tok.symbol} on ${chain.name}.`;
+    reasons.push(fake);
+    warnings.push(fake);
   }
   const lasts = once ? null : lasting(expires);
   if (lasts) reasons.push(lasts.reason);
@@ -448,6 +458,7 @@ function tokenApproval({ token, spender, amount, via, ctx, unlimitedAt, expires 
       ...(lasts && lasts.fact ? [fact('Permission ends', lasts.fact, lasts.tone ? { tone: lasts.tone } : {})] : []),
     ],
     reasons,
+    warnings,
     subject: {
       action: once ? 'permitTransfer' : 'approve',
       token: tok,
@@ -483,10 +494,13 @@ function approvalForAll({ collection, operator, approved, ctx }) {
     'The operator could transfer every item you own in this collection, now or later, without asking again.',
   ];
   const sp = spenderFacts(operator, ctx, reasons);
+  // Every item, to someone Guardian does not know.
+  const warnings = [...(sp.known ? [] : [reasons[0]]), ...(sp.warning ? [sp.warning] : [])];
   if (!sp.known) reasons.push('Guardian does not recognise the operator address.');
   reasons.push('The permission stays active until you revoke it.');
   return {
     kind: 'approveAll',
+    warnings,
     risk: sp.known ? 'caution' : 'danger',
     headline: 'Access to all your items in a collection',
     facts: [
@@ -540,6 +554,7 @@ function tokenTransfer({ token, from, recipient, amount, ctx }) {
         : ['The tokens come from the From address, not from this wallet. This works only if that address has allowed this wallet to move them.']),
       'This moves tokens to the address above. A confirmed transfer cannot be undone.',
     ],
+    warnings: judged.reasons,
     balanceReasons: judged.reasons,
     subject: {
       action: 'transfer',
@@ -567,13 +582,16 @@ function analyzeBatch(batch, ctx) {
     facts: parts.map((p, i) =>
       fact(`Action ${i + 1}`, withParty(p), p.risk === 'danger' ? { tone: 'danger' } : {}),
     ),
-    // The main reason of each part that is high risk or cannot be read.
+    // The main reason of each part that is high risk or cannot be read, and
+    // every part's warnings.
     reasons: unique([
       'One confirmation would carry out every action listed above.',
       ...parts
         .filter((p) => p.risk === 'danger' || p.kind === 'contractCall' || p.kind === 'deploy')
         .flatMap((p) => p.reasons.slice(0, 1)),
+      ...parts.flatMap((p) => p.warnings || []),
     ]),
+    warnings: unique(parts.flatMap((p) => p.warnings || [])),
     parts,
     subject: { action: 'batch', actions: parts.map((p) => p.subject) },
   };
@@ -690,6 +708,7 @@ function analyzeTypedData(raw, ctx) {
           ],
           // Every token's reasons: a fake token may be any one of them.
           reasons: unique(parts.flatMap((p) => p.reasons)),
+          warnings: unique(parts.flatMap((p) => p.warnings || [])),
           parts,
           subject: {
             action: 'permit2Batch',
@@ -785,6 +804,9 @@ function analyzeMessage(raw, ctx) {
       reasons: mismatch
         ? [`The message signs you in to ${claimed}, but you are on ${host}. A signature made here could be used to log in there as you.`]
         : ['This proves you own the wallet. It does not move funds or grant spending permissions.'],
+      warnings: mismatch
+        ? [`The message signs you in to ${claimed}, but you are on ${host}. A signature made here could be used to log in there as you.`]
+        : [],
       subject: { action: 'signIn', domain: claimed, mismatch },
       message: text,
     };

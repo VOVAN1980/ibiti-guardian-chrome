@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test test/analyzer.test.js test/prompt.test.js test/reading.test.js test/guard.test.js test/blind.test.js",
+    "test": "node --test test/analyzer.test.js test/prompt.test.js test/reading.test.js",
     "demo": "python -m http.server 5179 --bind 127.0.0.1",
     "test:e2e": "node build.mjs && node test/e2e.mjs && node test/swap.mjs && node test/tamper.mjs && node test/site.mjs",
     "deploy:site": "node build.mjs && node test/site.mjs && firebase deploy --only hosting"

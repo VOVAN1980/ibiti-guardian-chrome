@@ -222,14 +222,57 @@ section > h2 {
   color: var(--text-3);
 }
 
-/* Gemini's note: its own words, after code has checked its reading. */
+/* A status line about the AI: reading, not used, failed. */
 .ai-note {
   margin: 10px 0 0;
-  padding-left: 12px;
-  border-left: 2px solid var(--brand);
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* Most important: Guardian's warnings (always) and Gemini's picks. */
+.important {
+  margin-top: 12px;
+}
+
+.top-label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+
+.top {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.top li,
+.checks li {
+  position: relative;
+  padding-left: 22px;
+  line-height: 1.45;
+}
+
+.top li + li {
+  margin-top: 6px;
+}
+
+.top li::before,
+.checks li::before {
+  content: '•';
+  position: absolute;
+  left: 6px;
+  color: var(--brand);
+}
+
+.top li[data-by='guardian']::before,
+.checks li[data-by='guardian']::before {
+  content: '⚠';
+  left: 0;
+  color: var(--risk);
 }
 
 .ai-text.pending,
@@ -273,8 +316,9 @@ section > h2 {
 }
 
 .checks {
-  margin: 8px 0 0;
-  padding-left: 18px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
   color: var(--text-2);
 }
 
@@ -453,20 +497,6 @@ details.sent pre {
 
 .why li:first-child {
   border-top: 0;
-}
-
-/* The reasons Gemini picked as the most important. */
-.why li .pick {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--brand);
-  color: var(--brand);
-  font-size: 11px;
-  line-height: 1.5;
-  vertical-align: 1px;
-  white-space: nowrap;
 }
 
 .why li::before {

@@ -59,7 +59,8 @@ async function openReview(scenario) {
         return [row.querySelector('dt').textContent, address ? address.dataset.full : dd.childNodes[0].textContent];
       }),
     ),
-    reasons: [...document.querySelectorAll('#reasons li')].map((li) => li.textContent),
+    // Every reason, once: the warnings at the top, the rest under "Why this matters".
+    reasons: [...document.querySelectorAll('#local-top li, #reasons li')].map((li) => li.textContent),
   }));
   return { review, view };
 }
@@ -285,6 +286,8 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
       text: document.getElementById('local-text').textContent,
       note: document.getElementById('local-note').hidden ? '' : document.getElementById('local-note').textContent,
       meta: document.getElementById('local-meta').textContent,
+      check: document.getElementById('local-check').textContent,
+      important: [...document.querySelectorAll('#local-top li')].map((li) => `${li.dataset.reason}:${li.dataset.by}`),
       checked: document.body.dataset.checked,
       withheld: `${document.body.dataset.withheld || ''} [${document.body.dataset.withheldDetail || ''}]`,
       reading: document.body.dataset.reading,
@@ -293,12 +296,11 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
     assert.equal(out.source, 'in_cloud', 'the SDK fell back to the cloud');
     assert.match(out.chip, /^Cloud fallback · \d/);
     assert.match(out.text, /^If you confirm, someone else, an unknown address \(a personal wallet\), gets permission/);
-    // Gemini's reading must match the decoder. Its note is shown when it
-    // also passes the checks on its words (how often: test/ai-live.mjs).
-    assert.notEqual(out.checked, 'withheld', `Gemini's answer: ${String(out.reading).replace(/\s+/g, ' ')} ${out.withheld}`);
-    assert.ok(out.checked === 'note-withheld' || out.note.length > 20, 'Gemini’s note is shown');
+    // Gemini read the facts on its own; its reading must match the decoder.
+    assert.equal(out.checked, 'passed', `Gemini's answer: ${String(out.reading).replace(/\s+/g, ' ')} ${out.withheld}`);
+    assert.deepEqual(out.important.slice(0, 2), ['1:guardian', '2:guardian'], 'Guardian’s warnings first');
     assert.match(out.meta, /as you allowed/);
-    assert.match(out.meta, /matched Guardian's decoder/);
+    assert.match(out.check, /matched Guardian’s decoder/);
     assert.ok(first.calls.some((url) => url.includes('googleapis.com')), 'answered through Firebase');
     // What was shown is exactly what went out, and the window says so.
     assert.equal(first.bodies.length, 1, 'one cloud call for the explanation');
@@ -309,7 +311,7 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
       shown: !document.getElementById('local-sent-box').hidden,
     }));
     assert.deepEqual(after, { label: 'Exactly what was sent', sent: offer.sent, shown: true });
-    console.log(`     hybrid: ${out.chip} | ${out.checked} | ${(out.note || out.withheld).slice(0, 90)}`);
+    console.log(`     hybrid: ${out.chip} | ${out.checked} | ${out.important.join(' ')}`);
   } finally {
     await rejectAndWait(first.review);
   }
@@ -544,25 +546,27 @@ await step('a request Guardian cannot decode is not explained by any AI, even wi
   }
 });
 
-// Gemini Nano's answer, as Chrome would give it: the window shows the code's
-// sentence at once, and Gemini's note only when its reading of the request
-// matches the decoder. The model here is a stand-in that answers what each
-// case needs, so every outcome is checked, every time.
+// Gemini Nano's answer, as Chrome would give it. The window shows the code's
+// sentence and Guardian's warnings at once; Gemini's picks are added only
+// when its reading of the request matches the decoder, and nothing Gemini
+// writes is ever shown as text. The model here is a stand-in that answers
+// what each case needs, so every outcome is checked, every time.
+// (The claim's reasons: 1 any amount, 2 personal wallet — both warnings —
+// 3 unknown spender, 4 lasts until revoked.)
 const RIGHT = {
   action: 'spending_permission',
   who_gains: 'another_party',
   direction: 'out_of_your_wallet',
   limit: 'unlimited',
-  reasons: [2, 1],
-  note: 'Anyone with this permission could empty this token from your wallet later, without asking you.',
+  reasons: [3, 4],
 };
 const NANO_CASES = {
-  'a right reading: its note is shown, its picks are marked': JSON.stringify(RIGHT),
-  'who gains swapped: nothing from it is shown': JSON.stringify({ ...RIGHT, who_gains: 'you' }),
-  'direction swapped: nothing from it is shown': JSON.stringify({ ...RIGHT, direction: 'into_your_wallet' }),
-  'a note that names a token: the note is not shown': JSON.stringify({ ...RIGHT, note: 'Your USDT could be taken at any time.' }),
-  'a note that calls it safe: the note is not shown': JSON.stringify({ ...RIGHT, note: 'This is a normal request and it is safe to confirm.' }),
-  'plain text instead of the form: nothing from it is shown': 'Sure! The spender can take your USDT.',
+  'a right reading: its picks are added after Guardian’s warnings': JSON.stringify(RIGHT),
+  'it picks no warning: the warnings are still shown, first': JSON.stringify({ ...RIGHT, reasons: [4] }),
+  'who gains swapped: nothing from it is used': JSON.stringify({ ...RIGHT, who_gains: 'you' }),
+  'direction swapped: nothing from it is used': JSON.stringify({ ...RIGHT, direction: 'into_your_wallet' }),
+  'words of its own: never shown': JSON.stringify({ ...RIGHT, note: 'This request is safe to confirm.' }),
+  'plain text instead of the form: nothing from it is used': 'Sure! This request is safe to confirm.',
 };
 for (const [name, answer] of Object.entries(NANO_CASES)) {
   await step(`on device, ${name}`, async () => {
@@ -597,45 +601,50 @@ for (const [name, answer] of Object.entries(NANO_CASES)) {
         local: document.body.dataset.local,
         source: document.body.dataset.source,
         checked: document.body.dataset.checked,
-        withheld: document.body.dataset.withheld || '',
         chip: document.getElementById('local-chip').textContent,
         text: document.getElementById('local-text').textContent,
+        important: [...document.querySelectorAll('#local-top li')].map((li) => `${li.dataset.reason}:${li.dataset.by}`),
+        picked: document.getElementById('local-picked').hidden ? null : document.getElementById('local-picked').textContent,
         note: document.getElementById('local-note').hidden ? null : document.getElementById('local-note').textContent,
-        meta: document.getElementById('local-meta').textContent,
-        picks: [...document.querySelectorAll('#reasons li[data-top]')].map((li) => li.dataset.top),
+        check: document.getElementById('local-check').textContent,
+        checkOpen: document.getElementById('local-check-box').open,
+        main: [...document.querySelectorAll('#local > :not(details)')].filter((e) => !e.hidden).map((e) => e.innerText).join(' '),
+        all: document.body.innerText,
         nano: window.__nano,
       }));
       assert.equal(out.local, 'done');
       assert.equal(out.source, 'on_device');
       assert.match(out.chip, /^On device · \d/);
       assert.deepEqual(calls, [], 'nothing left the computer');
-      // The code's sentence, whatever the model said.
+      // The code's sentence and the warnings, whatever the model said.
       assert.match(out.text, /^If you confirm, someone else, an unknown address \(a personal wallet\), gets permission to take any amount of USDT/);
-      // The model was asked for the form, with the form as its response constraint.
+      assert.deepEqual(out.important.slice(0, 2), ['1:guardian', '2:guardian']);
+      // The main view never says Gemini "agrees": that could read as an all-clear.
+      assert.doesNotMatch(out.main, /agree|approved|✓/i);
+      assert.equal(out.checkOpen, false, 'the details stay closed');
+      assert.doesNotMatch(out.all, /safe to confirm/, 'no words of the model anywhere');
+      // The model was asked for the form, with the form as its response
+      // constraint, and was not told the code's sentence.
       assert.equal(out.nano.length, 1);
       const constraint = JSON.parse(out.nano[0].options).responseConstraint;
       assert.deepEqual(constraint.properties.who_gains.enum, ['another_party', 'you', 'nobody']);
+      assert.ok(!out.nano[0].contents.includes('without asking you again, until you revoke it'), 'not the code’s sentence');
       assert.ok(!out.nano[0].contents.toLowerCase().includes('1111111111111111111111111111111111111111'), 'not the user’s address');
-      if (name.startsWith('a right reading')) {
+      if (name.startsWith('a right reading') || name.startsWith('words of its own')) {
         assert.equal(out.checked, 'passed');
-        assert.equal(out.note, RIGHT.note);
-        assert.deepEqual(out.picks.sort(), ['1', '2']);
-        assert.match(out.meta, /nothing was sent to an AI service/);
-        assert.match(out.meta, /matched Guardian's decoder/);
-      } else if (name.startsWith('a note')) {
-        assert.equal(out.checked, 'note-withheld');
-        assert.equal(out.note, null, 'the note is not on screen');
-        assert.deepEqual(out.picks.sort(), ['1', '2'], 'its reading matched, so its picks stay');
-        assert.match(out.meta, /but its note was not shown/);
-        assert.doesNotMatch(out.meta, /USDT could|safe to confirm/, 'the window does not repeat it');
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:gemini', '4:gemini']);
+        assert.match(out.picked, /picked from Guardian’s reasons by Gemini Nano on your computer/);
+        assert.match(out.check, /matched Guardian’s decoder: a spending permission · someone else gains · out of your wallet · unlimited/);
+        assert.equal(out.note, null);
+      } else if (name.startsWith('it picks no warning')) {
+        assert.equal(out.checked, 'passed');
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian', '4:gemini']);
       } else {
         assert.equal(out.checked, 'withheld');
-        assert.equal(out.note, null, 'nothing from the model is on screen');
-        assert.deepEqual(out.picks, []);
-        assert.match(
-          out.meta,
-          name.startsWith('plain text') ? /no usable answer/ : /a different reading of the request \((who gains|which way assets move)\)/,
-        );
+        assert.deepEqual(out.important, ['1:guardian', '2:guardian'], 'only Guardian’s warnings');
+        assert.equal(out.picked, null);
+        assert.match(out.note, /Gemini’s answer was not used this time/);
+        assert.match(out.check, name.startsWith('plain text') ? /no usable answer/ : /differently from Guardian’s decoder \((who gains|which way assets move)\)/);
       }
       // The decision still works.
       assert.equal(await tab.evaluate(() => !document.getElementById('reject').disabled), true);
@@ -693,7 +702,7 @@ for (const mode of ['unreachable', 'over quota', 'silent', 'timed out']) {
         badge: document.getElementById('badge').textContent,
         headline: document.getElementById('headline').textContent,
         facts: document.querySelectorAll('.fact').length,
-        reasons: document.querySelectorAll('#reasons li').length,
+        reasons: document.querySelectorAll('#local-top li, #reasons li').length,
         reject: !document.getElementById('reject').disabled,
         allow: !document.getElementById('allow').disabled,
       }));
