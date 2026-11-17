@@ -381,3 +381,38 @@ test('real Gemini answers to the forms, recorded live, get the verdict they dese
   assert.ok(count >= 50, `${count} answers`);
   assert.deepEqual(wrong, []);
 });
+
+// Blind form sets: answers written by an independent author who saw only the
+// decoded requests and the model's instructions. Each set was measured once
+// as written (its first-run result is named in the file); what it revealed
+// was fixed, and the set stays here so it cannot come back.
+test('blind form sets: correct answers are shown, wrong ones are not', async () => {
+  const { checkExplanation, checkAnalysis } = await import('../src/ai/reading.js');
+  const { ownAddresses } = await import('../src/ai/guard.js');
+  const dir = new URL('./fixtures/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => /^forms-set-.*\.json$/.test(f));
+  assert.ok(files.length >= 1);
+  for (const file of files) {
+    const { entries, disagree } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    const records = JSON.parse(readFileSync(new URL(file.replace('forms-set-', 'forms-records-'), dir), 'utf8'));
+    const wrong = [];
+    for (const e of entries) {
+      const record = records[e.scenario];
+      const result = analyze(record);
+      const host = new URL(record.origin).host;
+      const options = { sentence: meaning(result, host), own: ownAddresses(record), chainId: record.chainId, host };
+      const text = JSON.stringify(e.answer);
+      let got;
+      if (e.form === 'deep') {
+        got = checkAnalysis(text, result, options).passed ? 'show' : 'hide';
+      } else {
+        const shown = shownReasons(result, { cloud: true }).map(([n]) => n);
+        got = { passed: 'show', 'note-withheld': 'hide_note', withheld: 'hide_all' }[checkExplanation(text, result, { ...options, shown }).checked];
+      }
+      if (got !== e.expected && !disagree[`${e.scenario}/${e.form}/${e.error || 'correct'}`]) {
+        wrong.push(`${file} ${e.scenario}/${e.form}/${e.error || 'correct'}: expected ${e.expected}, got ${got}: ${text}`);
+      }
+    }
+    assert.deepEqual(wrong, []);
+  }
+});

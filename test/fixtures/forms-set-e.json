@@ -1,0 +1,2922 @@
+{
+ "made": "2026-11-17, blind author; measured once on e6b4175 (video/pipeline/live/holdout/result-E-first-run-e6b4175.txt)",
+ "disagree": {
+  "oneTimeTake/deep/field_pattern": "approval_phishing is accepted for a permit signature too: a permit is an approval given by signature, and live Gemini names it so (test/fixtures/real-forms.json)."
+ },
+ "entries": [
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take any amount of this token from your wallet at any time, and the spender is unknown."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Approve with unlimited amount to an unrecognised spender: spending permission, another party, out, unlimited; note true and rule-clean."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "This gives the spender open-ended access to this token: it could move as much as you hold, now or later, until you cancel the permission."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note stresses the open-ended, lasting permission without names or reassurance."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender would get the power to drain this token from your wallet without asking you again, and that power lasts until you take it back."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; plain-words note scoped to this token."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could move any amount of this token out of your wallet, now or later, without asking you again."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "Amount is unlimited, but limit says limited."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender would get permission to take all your tokens from your wallet at any time, without asking you again."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "Permission covers only this token; note claims all your tokens."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take a small amount of this token from your wallet without asking you again, until you cancel the permission."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "Calls an unlimited permission a small amount."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take any amount of your USDT at any time, without asking you again, until you cancel the permission."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Meaning right, but the note names the token."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender is a verified contract, but it could still move any amount of this token from your wallet until you cancel the permission."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Only the token contract is verified; the spender is unrecognised, yet the note calls it verified."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "approval_phishing",
+    "summary": "This is a standing permission for an unknown spender to take as much of this token as it wants from your wallet, the way many wallet-draining scams work.",
+    "checks": [
+     "Did you expect this site to ask for permission to spend this token at all?",
+     "Is the spender the service you actually meant to use?",
+     "Would a capped amount do instead of an open-ended permission?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "On-chain unlimited approve to an unrecognised spender from a rewards site: approval_phishing shape; summary and checks clean."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "permit_phishing",
+    "summary": "This is a standing permission for an unknown spender to take as much of this token as it wants from your wallet.",
+    "checks": [
+     "Is the spender the service you meant to use?",
+     "Did you expect this site to ask for spending permission on this token?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "This is an on-chain approve transaction, not a signed permit; pattern should be approval_phishing."
+  },
+  {
+   "scenario": "bscUnlimited",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "approval_phishing",
+    "summary": "This is an open-ended permission for an unknown spender to take this token from your wallet whenever it likes.",
+    "checks": [
+     "Is 0x7d2a…9e14 the spender you expected?",
+     "Did you expect this site to ask for spending permission on this token at all?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_names",
+   "why": "A check quotes the spender address."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This raises how much of this token the spender may take from your wallet, and the spender is unknown."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "increaseAllowance by a fixed amount to an unrecognised spender: spending permission, another party, out, limited."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "The spender would be allowed to take more of this token from your wallet without asking again, and the extra permission lasts until you cancel it."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note covers the extra room and that it lasts."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender gets room to move an extra, capped amount of this token out of your wallet whenever it wants."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; capped is accurate, no amount named."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "If you confirm, an unknown spender may take more of this token from your wallet without asking you again."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "increaseAllowance grants spending room; it is a spending permission, not a payment."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This raises your own spending limit for this token, so you could move more of it through the spender until you cancel it."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The spender gets the extra permission, not the user."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take an extra, capped amount of this token from your wallet without asking again, and the spender is unknown."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "The spender gains the right to move the token; who_gains should be another_party."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Confirming adds more of this token to your wallet, which the unknown spender would then be allowed to manage."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "Nothing is added to the wallet; the token can go out to the spender."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "approval_phishing",
+    "summary": "This is a permission that lets an unknown spender take an extra, capped amount of this token from your wallet at any time.",
+    "checks": [
+     "Is the spender the service you meant to use?",
+     "Did you expect this site to need more spending room on this token?",
+     "Does the extra amount match what you plan to spend there?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Approval to an unrecognised spender on a rewards site has the approval_phishing shape even though capped (judgment call: capped amount)."
+  },
+  {
+   "scenario": "increaseUsdc",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "approval_phishing",
+    "summary": "This is a permission that lets an unknown spender take more of this token from your wallet at any time.",
+    "checks": [
+     "Is the spender the service you meant to use?",
+     "Does the extra amount match what you plan to spend there?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_limit",
+   "why": "The increase is a fixed amount, so limit is limited."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Until the end date, the spender could take up to a capped amount of this token from your wallet at any time, without asking you again."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Signed permission, capped, with an end date: spending permission, another party, out, limited."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "This signature stays out of your wallet history, yet the spender could use it to take up to a capped amount of this token until the end date."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note explains the hidden-signature point without naming spender or date."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "If you confirm, the spender may move a capped amount of this token out of your wallet whenever it chooses, until the permission ends or you cancel it."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no reassurance about the well-known spender."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take up to a capped amount of this token from your wallet without asking you again, until the end date."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "A signature costs no gas but still lets the token go out; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender is a verified, official service, and it could take up to a capped amount of this token from your wallet until the end date."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Facts call the spender well-known, not verified or official."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The 1inch router could take up to a capped amount of this token from your wallet until the end date, without asking you again."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Names the spender service."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Because the spender is a well-known service and the permission expires on its own, there is nothing to worry about here."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Implies nothing can go wrong."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender could take this token from your wallet a single time, and after that the permission is used up."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "The permission lasts until the end date for up to the cap, not a single use."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a signed permission, not a transaction, that lets the spender take a capped amount of this token from your wallet until an end date.",
+    "checks": [
+     "Is the spender the service you meant to use on this site?",
+     "Does the amount match what you plan to trade?",
+     "Is the end date no later than you need?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call: a permit signature, but to a well-known spender, capped and short-lived, so it does not have the permit_phishing shape."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a signed permission for an official, trusted exchange service to take a capped amount of this token from your wallet until an end date.",
+    "checks": [
+     "Does the amount match what you plan to trade?",
+     "Is the end date no later than you need?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_verified",
+   "why": "Summary calls the spender official and trusted; facts only say well-known."
+  },
+  {
+   "scenario": "permit2Expiring",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a signed permission that lets the spender take a capped amount of this token from your wallet until an end date.",
+    "checks": [
+     "Is the spender the service you meant to use?",
+     "Does the amount match what you plan to trade?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_direction",
+   "why": "The token can leave the wallet; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Your signature would let a stranger's personal wallet take up to a capped amount of this token from your wallet, a single time, at any point before it expires far in the future."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Signed take-permission for a capped amount to an unknown personal wallet: spending permission, another party, out, limited."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The spender is a person's wallet rather than an app, and this signature lets it pull a capped amount of this token out of your wallet whenever it chooses before the signature expires."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note leads with the personal-wallet red flag."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "An unknown spender could use this signature to take up to a capped amount of this token from your wallet, and it stays usable for a long time."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note true, no names or numbers."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender could use this signature to take up to a capped amount of this token from your wallet before it expires."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "The amount is capped, so limit is limited."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "nobody",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Signing lets an unknown personal wallet take up to a capped amount of this token from your wallet, a single time, before the signature expires."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "The spender can take the token; who_gains is another_party, not nobody."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This signature just signs you in to the site, letting it confirm that the wallet belongs to you."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes a take-permission signature as a sign-in."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Signing lets you take up to a capped amount of this token from the spender's wallet, a single time, before the signature expires."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The spender takes from the user, not the other way round."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "permit_phishing",
+    "summary": "This is a signed permission that lets an unknown personal wallet pull a capped amount of this token out of your wallet, the shape of signature scams that take tokens without a transaction.",
+    "checks": [
+     "Did you expect to give anyone the right to take this token?",
+     "Is the spender an app's address or a person's wallet?",
+     "Why would the signature need to stay valid for so long?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Signed transfer permission to an unknown personal wallet with a very long validity: permit_phishing."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "approval_phishing",
+    "summary": "This is a signed permission that lets an unknown personal wallet pull a capped amount of this token out of your wallet.",
+    "checks": [
+     "Did you expect to give anyone the right to take this token?",
+     "Is the spender an app's address or a person's wallet?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "It is an off-chain signature, so the pattern is permit_phishing, not approval_phishing."
+  },
+  {
+   "scenario": "oneTimeTake",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "permit_phishing",
+    "summary": "This is just a free signature for a single small transfer, far less serious than a standing spending permission.",
+    "checks": [
+     "Is the spender an app's address or a person's wallet?",
+     "Why would the signature need to stay valid for so long?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_understates",
+   "why": "Summary plays down a large, long-valid take-permission to a stranger as small and minor."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This signature would let an unknown spender take the tokens listed out of your wallet before it expires, with no upper limit on part of it."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Single signed permission over the listed tokens; one has no cap, so limit is unlimited."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "By signing, you give an unknown spender the right to pull the listed tokens from your wallet, including an uncapped amount of the token at the top of the list."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; scope kept to the listed tokens."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The unknown spender could later take the listed tokens from your wallet, and for the top token there is no limit on how much."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note true and plain."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This signature would let an unknown spender take the tokens listed out of your wallet before it expires, with no upper limit on part of it."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "One token can be taken in any amount, so limit is unlimited."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender could use this signature to empty every token in your wallet before it expires."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "Covers only the listed tokens, not every token in the wallet."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown spender could take a capped amount of each listed token from your wallet before the signature expires."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "Says every token is capped; one can be taken in any amount."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "nothing_moves",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "By signing, you let an unknown spender take the listed tokens from your wallet, with no upper limit on the top token."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "Being a signature does not stop the tokens leaving; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "permit_phishing",
+    "summary": "This is a signed permission that lets an unknown spender pull the listed tokens out of your wallet, including an uncapped amount of the top token, without any transaction.",
+    "checks": [
+     "Did you expect to let anyone take these tokens at all?",
+     "Why would the top token need no cap?",
+     "Is the spender an address you know?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Signed take-permission over several tokens to an unrecognised spender, long validity: permit_phishing."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "permit_phishing",
+    "summary": "This is a signed permission that lets an unknown spender pull the listed tokens out of your wallet without any transaction.",
+    "checks": [
+     "Did you expect to let anyone take these tokens at all?",
+     "Is the spender an address you know?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_limit",
+   "why": "One token has no cap, so limit is unlimited."
+  },
+  {
+   "scenario": "oneTimeTakeTwo",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "permit_phishing",
+    "summary": "This signature lets an unknown spender take everything in your wallet without any transaction.",
+    "checks": [
+     "Did you expect to let anyone take these tokens at all?",
+     "Is the spender an address you know?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_scope",
+   "why": "Summary claims the whole wallet; only the listed tokens are covered."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Besides letting an unknown spender take a capped amount of this token, confirming also sends some of your coins off right away, which this kind of request has no reason to do."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Capped approve to an unknown spender with coins attached: spending permission, another party, out, limited; note covers both."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "Confirming sends some of your coins out right now and also lets an unknown spender take a capped amount of this token later."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; leads with the attached coins, as line 1 does."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This request attaches a payment of coins to a spending permission, so you would lose those coins at once, and the spender could also take some of this token."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no names or amounts."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This only lets an unknown spender take a small, capped amount of this token from your wallet."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "Leaves out the coins sent straight away and calls it only a small permission."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Confirming sends 0.5 ETH away right now and lets an unknown spender take a capped amount of this token later."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Names the coin and the amount."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Confirming sends some of your coins out right now and also lets an unknown spender take a capped amount of this token later."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "Coins leave at once and the token can follow; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Confirming lets an unknown spender take a capped amount of this token, and you would also receive some coins as part of the request."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "The coins are sent out, not received."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The permission is small and capped, so even with the attached coins there is little that can go wrong here."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Implies there is little that can go wrong."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "approval_phishing",
+    "summary": "This is a spending permission for an unknown spender that also pays coins out of your wallet on the spot, which this kind of request has no reason to do.",
+    "checks": [
+     "Why would a spending permission need coins attached?",
+     "Did the site say it would charge you anything?",
+     "Is the spender the service you meant to use?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Approve to an unrecognised spender (plus odd attached coins) has the approval_phishing shape; it is a single call, not a batch."
+  },
+  {
+   "scenario": "approveWithCoins",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "approval_phishing",
+    "summary": "This is a small, capped spending permission for this token and nothing more.",
+    "checks": [
+     "Is the spender the service you meant to use?",
+     "Does the amount match what you plan to spend?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_understates",
+   "why": "Summary hides the coins sent at once and calls it nothing more than a small permission."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The tokens come from another address, which must have allowed your wallet to move them, and they go to the recipient for good."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call: a transfer of someone else's tokens; the user's own assets do not move, so who_gains nobody and nothing_moves; payment is the closest action, so limited."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Your wallet would be acting on another address's permission to send its tokens to the recipient, and once confirmed the move is final."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; note correctly places the tokens with another address."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This moves someone else's tokens to the recipient, and it works only if that other address gave your wallet permission."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; single most important reason is fine."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The tokens come from another address that allowed your wallet to move them, and once sent to the recipient the move is final."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "The tokens come from another address, not from the user's wallet."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This sends someone else's tokens to the recipient using a permission that address gave your wallet."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "transferFrom uses an existing permission to move tokens; it grants none, so it is not a spending_permission."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Someone else's tokens would be moved into your wallet, using a permission that address gave you."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The tokens go to the recipient, not to the user."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "These tokens would leave your wallet and go to the recipient, and once confirmed the move is final."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "Says the tokens leave the user's wallet; they come from another address."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "75 USDT would be moved from another address to the recipient, using a permission that address gave your wallet."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Names the amount and the token."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a transfer of someone else's tokens to the recipient, carried out by your wallet under a permission that other address gave it.",
+    "checks": [
+     "Do you know why this site wants your wallet to move another address's tokens?",
+     "Do you recognise the address the tokens come from, and the recipient?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call: none of the listed scam shapes fits a transfer of another address's tokens; no_known_pattern (cannot_determine also arguable)."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a transfer of someone else's tokens to the recipient, using a permission that other address gave your wallet.",
+    "checks": [
+     "Do you know why this site wants your wallet to move another address's tokens?",
+     "Do you recognise the recipient?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_direction",
+   "why": "The user's own assets do not move; direction is nothing_moves."
+  },
+  {
+   "scenario": "moveSomeoneElses",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "limited",
+    "pattern": "approval_phishing",
+    "summary": "This is a transfer of someone else's tokens to the recipient, using a permission that other address gave your wallet.",
+    "checks": [
+     "Do you know why this site wants your wallet to move another address's tokens?",
+     "Do you recognise the recipient?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "No permission is being granted here, so it does not have the approval_phishing shape."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "These coins leave this address and go to another address of your own wallet, and a confirmed transfer is final."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call on direction: coins leave this address (out_of_your_wallet) but land at the user's own address, so who_gains is you; payment, limited."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "A sizeable share of your coins moves to your own other address, and the transfer is final once confirmed."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; share described without a number."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This sends part of your coins to another address in your own wallet, so the move is permanent once you confirm."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; no reassurance about it being your own address."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "These coins leave this address and go to another address of your own wallet, and a confirmed transfer is final."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "The recipient is the user's own address; who_gains is you."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "The coins would come into this address from your other address, and the move is final once confirmed."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "Reverses the flow: the coins leave this address."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "Since the coins just go to your own other address, there is nothing that can go wrong here."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Says nothing can go wrong."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This gives your other address permission to spend these coins from this wallet whenever it wants."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes a direct send as a spending permission."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a transfer of coins from this address to another address that belongs to your own wallet.",
+    "checks": [
+     "Is the receiving address the right address within your own wallet?",
+     "Do you mean to move this large a share of these coins?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Self-transfer matches none of the scam shapes; fields as in the short form."
+  },
+  {
+   "scenario": "toMyOtherAccount",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a transfer of coins from this address to another address that belongs to your own wallet.",
+    "checks": [
+     "Is the receiving address the right address within your own wallet?",
+     "Do you mean to move this large a share of these coins?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_who",
+   "why": "The recipient is the user's own address; who_gains is you."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown operator could move every item you own in this collection, including ones you get later, without asking you again."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "setApprovalForAll to an unrecognised operator: collection access, another party, out, unlimited."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "This hands control of your items in this collection to the operator, now and in the future, until you cancel the permission."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; scope kept to this collection."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "If you confirm, an unknown operator gets standing access to take any of your items in this collection whenever it wants."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; plain and scoped."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown operator could move every item you own in this collection, including ones you get later, without asking you again."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "Access to a whole collection is unlimited."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown operator could move every collectible in your wallet, across all your collections, without asking you again."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "Covers only this collection, not all collections."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "An unknown operator could move every item you own in this collection on Polygon, including ones you get later, without asking you again."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Names the network."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "You would get access to move the operator's items in this collection whenever you want, until the permission is cancelled."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The operator gets access to the user's items, not the reverse."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "explain",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "The operator could move the items you currently hold in this collection without asking you again."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "Limits it to items held now; the permission also covers items received later."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "deep",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "collection_approval_phishing",
+    "summary": "This is a blanket permission for an unknown operator to take every item you own in this collection, the way collection-draining scams work.",
+    "checks": [
+     "Does this site need to move your items in this collection at all?",
+     "Is the operator the marketplace you meant to use?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Collection-wide access to an unrecognised operator: collection_approval_phishing."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "deep",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "approval_phishing",
+    "summary": "This is a blanket permission for an unknown operator to take every item you own in this collection.",
+    "checks": [
+     "Does this site need to move your items in this collection at all?",
+     "Is the operator the marketplace you meant to use?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "Collection-wide access is the collection_approval_phishing shape, not token approval_phishing."
+  },
+  {
+   "scenario": "polygonCollection",
+   "form": "deep",
+   "answer": {
+    "action": "collection_access",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "pattern": "collection_approval_phishing",
+    "summary": "This is a blanket permission for an unknown operator to take every item you own in this collection.",
+    "checks": [
+     "Are you comfortable giving the operator access to all your NFTs?",
+     "Is the operator the marketplace you meant to use?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_scope",
+   "why": "A check widens the scope to all the user's collectibles."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming takes away the operator's access to your items in this collection."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Revoke of approval for all: remove_permission, nobody, nothing_moves, does_not_apply."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This ends a permission you gave earlier, so the operator loses its hold on your items in this collection."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note true and scoped."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Once confirmed, the earlier permission the operator had over your items in this collection is cancelled."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no claim of safety."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "another_party",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming takes away the operator's access to your items in this collection."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "Removing access gives nobody anything; who_gains is nobody."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This ends a permission you gave earlier, so the operator loses its hold on your items in this collection."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "Nothing moves when a permission is removed."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming gives the operator access to your items in this collection until you cancel it."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes a removal as a grant."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "explain",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming removes every permission you have ever given, across all your collections and tokens."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "Only this operator's access to this collection is removed."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "deep",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "no_known_pattern",
+    "summary": "This cancels a permission that let the operator move your items in this collection.",
+    "checks": [
+     "Is this the permission you meant to remove?",
+     "Is this the collection you had in mind?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "A revoke matches no scam shape."
+  },
+  {
+   "scenario": "endCollectionAccess",
+   "form": "deep",
+   "answer": {
+    "action": "remove_permission",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "collection_approval_phishing",
+    "summary": "This cancels a permission that let the operator move your items in this collection.",
+    "checks": [
+     "Is this the permission you meant to remove?",
+     "Is this the collection you had in mind?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "It removes collection access rather than granting it, so collection_approval_phishing does not fit."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Whoever holds this signature could complete the trade and take the items you offer, and the price in the order might be far below what they're worth."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Signed marketplace order: marketplace_order, another party (the holder), your offered items go out, limit does_not_apply."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     3
+    ],
+    "note": "This signs a trade offer for your items, and it stays out of your wallet history until someone uses it to take them."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no app name or item count."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Your signature would let someone carry out this trade and receive the items you offer, at whatever price the order sets."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note true and plain."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Your signature would let someone carry out this trade and receive the items you offer, at whatever price the order sets."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "It is a marketplace order, not plain text."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "into_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Whoever holds this signature could complete the trade and take the items you offer, and the price in the order might be far below what they're worth."
+   },
+   "expected": "hide_all",
+   "error": "field_direction",
+   "why": "The user's offered items leave the wallet; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This signs you in to a marketplace so you can browse and list your items later."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes an order signature as a sign-in."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "This is an order on a verified marketplace, and whoever holds it could complete the trade and take the items you offer."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Facts name the app but do not say it is verified."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "explain",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1,
+     2
+    ],
+    "note": "Whoever holds this Seaport signature could complete the trade and take the items you offer, possibly for far less than they're worth."
+   },
+   "expected": "hide_note",
+   "error": "note_names",
+   "why": "Names the marketplace app."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "deep",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "pattern": "marketplace_order_phishing",
+    "summary": "This is a signed marketplace order that lets whoever holds it take the items you offer at the price it sets, the shape of scams that sell items for almost nothing.",
+    "checks": [
+     "Is the price in the order what you meant to ask?",
+     "Did you mean to put these items up for sale through this site?",
+     "Are the items in the order exactly the items you meant to offer?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call: a non-marketplace site asking for an order over your items has the marketplace_order_phishing shape; price is unknown, so cannot_determine is arguable."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "deep",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "into_your_wallet",
+    "limit": "does_not_apply",
+    "pattern": "marketplace_order_phishing",
+    "summary": "This is a signed marketplace order that lets whoever holds it take the items you offer at the price it sets.",
+    "checks": [
+     "Is the price in the order what you meant to ask?",
+     "Are the items in the order exactly the items you meant to offer?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_direction",
+   "why": "The offered items leave the wallet; direction is out_of_your_wallet."
+  },
+  {
+   "scenario": "listingOrder",
+   "form": "deep",
+   "answer": {
+    "action": "marketplace_order",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "pattern": "marketplace_order_phishing",
+    "summary": "This is a standard listing of your items, the way marketplaces normally work.",
+    "checks": [
+     "Is the price in the order what you meant to ask?",
+     "Are the items in the order exactly the items you meant to offer?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_safe",
+   "why": "Summary calls it standard and normal."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Your signature becomes a record that you accepted the text shown, and the site can keep it as proof."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Plain-text signature: sign_text, nobody, nothing_moves, does_not_apply."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Signing ties your wallet to the text you see, so it can later be used to show you agreed to it."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; note true, no site name."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "By signing, you put your agreement to this text on record with the site."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; short and plain."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Signing ties your wallet to the text you see, so it can later be used to show you agreed to it."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "It is a plain text message, not a sign-in message."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Signing this text takes a small fee out of your wallet and records that you agreed to it."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "Signing text moves nothing; the note says assets leave."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This is just harmless text, so signing it cannot put anything at risk."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Calls it harmless and says what cannot happen."
+  },
+  {
+   "scenario": "termsText",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "These are the site's official terms of service, and signing records that you agreed to them."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Nothing in the facts says the text is official."
+  },
+  {
+   "scenario": "termsText",
+   "form": "deep",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "no_known_pattern",
+    "summary": "This is a signature on readable text that records your agreement to what it says.",
+    "checks": [
+     "Does the text say only what you expect to agree to?",
+     "Is this the site you meant to deal with?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Readable text signature matches no scam shape."
+  },
+  {
+   "scenario": "termsText",
+   "form": "deep",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "sign_in_phishing",
+    "summary": "This is a signature on readable text that records your agreement to what it says.",
+    "checks": [
+     "Does the text say only what you expect to agree to?",
+     "Is this the site you meant to deal with?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "It is not a sign-in at all, so sign_in_phishing does not fit."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Signing proves to the site that you control this wallet, and the site can then link your activity to it."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Sign-in message for the site you are on: sign_in, nobody, nothing_moves, does_not_apply."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This lets the site confirm the wallet is yours, so what you do there is tied to your wallet."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no site name, no reassurance."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Your signature works as proof for the site you are on that you own this wallet, so it can recognise you."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; plain words."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "The sign-in request is verified as coming from the official site, and it proves that you control this wallet."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Facts only show the domain matches; nothing says verified or official."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_text",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "Signing proves to the site that you control this wallet, and the site can then link your activity to it."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "It is a sign-in message, so action is sign_in."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This is a normal sign-in that only proves the wallet is yours, so nothing can go wrong."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Calls it normal and says nothing can go wrong."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This gives the site permission to spend from your wallet whenever you use it."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes a sign-in as a spending permission."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "explain",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "you",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This lets the site confirm the wallet is yours, so what you do there is tied to your wallet."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "No one can move or receive assets from a sign-in; who_gains is nobody."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "deep",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "no_known_pattern",
+    "summary": "This is a sign-in that proves to the site you are on that you control this wallet.",
+    "checks": [
+     "Is the site named in the message the site you meant to visit?",
+     "Did you start this sign-in yourself?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Sign-in domain matches the page, so it lacks the sign_in_phishing shape."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "deep",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "sign_in_phishing",
+    "summary": "This is a sign-in that proves to the site you are on that you control this wallet.",
+    "checks": [
+     "Is the site named in the message the site you meant to visit?",
+     "Did you start this sign-in yourself?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "The sign-in is for the site the user is on; no mismatch, so not sign_in_phishing."
+  },
+  {
+   "scenario": "signInHere",
+   "form": "deep",
+   "answer": {
+    "action": "sign_in",
+    "who_gains": "nobody",
+    "direction": "nothing_moves",
+    "limit": "does_not_apply",
+    "pattern": "no_known_pattern",
+    "summary": "This is a verified sign-in from the official site that proves you control this wallet.",
+    "checks": [
+     "Did you start this sign-in yourself?",
+     "Is the site named in the message the site you meant to visit?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_verified",
+   "why": "Summary calls the sign-in verified and official."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "With a single confirmation you would give a spender permission over a capped amount of a token and also send another token to the recipient."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Batch of a capped permission and a send: several_actions, another party, out; limit judged limited since every part is capped."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "The steps in this bundle happen together: you give the spender permission to take a capped amount of a token, and another token goes straight to the recipient."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; names neither the spender service nor the tokens."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming carries out every listed action at once, so you would also be sending a token straight to the recipient alongside the spending permission."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Same fields; points at the bundled transfer."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "The steps in this bundle happen together: you give the spender permission to take a capped amount of a token, and another token goes straight to the recipient."
+   },
+   "expected": "hide_all",
+   "error": "field_action",
+   "why": "Two different actions in one confirmation: several_actions."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "unlimited",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming carries out every listed action at once, so you would also be sending a token straight to the recipient alongside the spending permission."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "Both the permission and the send are capped amounts; nothing is unlimited."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This only gives a spender permission to use a capped amount of this token."
+   },
+   "expected": "hide_note",
+   "error": "note_understates",
+   "why": "Leaves out the direct send bundled in the same confirmation."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This swaps this token for another, so the other token comes into your wallet with this confirmation."
+   },
+   "expected": "hide_note",
+   "error": "note_direction",
+   "why": "The second token is sent out to an address, not received."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "explain",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "A single confirmation would give the spender access to all your funds and also send another token away from your wallet."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "The permission covers a capped amount of one token, not all funds."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "deep",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "risky_action_in_a_batch",
+    "summary": "This is a bundle of actions approved together, where a direct transfer to an address rides along with a spending permission, which is how risky steps get slipped into batches.",
+    "checks": [
+     "Do you expect a direct transfer to the recipient as part of this?",
+     "Is the spender the service you meant to use?",
+     "Does each amount match what you intended?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Judgment call: a direct send to an unlabelled address bundled with a permission has the risky_action_in_a_batch shape."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "deep",
+   "answer": {
+    "action": "spending_permission",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "risky_action_in_a_batch",
+    "summary": "This is a bundle of actions approved together, where a direct transfer rides along with a spending permission.",
+    "checks": [
+     "Do you expect a direct transfer to the recipient as part of this?",
+     "Does each amount match what you intended?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_action",
+   "why": "Two actions in one confirmation: several_actions."
+  },
+  {
+   "scenario": "batchSwap",
+   "form": "deep",
+   "answer": {
+    "action": "several_actions",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "risky_action_in_a_batch",
+    "summary": "This is a bundle of actions approved together, where a direct transfer rides along with a spending permission.",
+    "checks": [
+     "Is 0xb81c…6c21 an address you know?",
+     "Is the Uniswap spender the one you expected?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_names",
+   "why": "Checks quote an address and a service name."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "A large share of this token leaves your wallet for the recipient, and once confirmed the transfer is final."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Token transfer to another address: payment, another party, out, limited."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This sends a big part of your balance of this token to the recipient, and the transfer is permanent once confirmed."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; share described without a number."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "If the recipient is the wrong address, this token is gone for good once you confirm."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; says what could go wrong without advice."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "you",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "A large share of this token leaves your wallet for the recipient, and once confirmed the transfer is final."
+   },
+   "expected": "hide_all",
+   "error": "field_who",
+   "why": "The recipient is another address; who_gains is another_party."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "The recipient is a verified address, so this token goes exactly where you intended, and the transfer is final."
+   },
+   "expected": "hide_note",
+   "error": "note_verified",
+   "why": "Only the token contract is verified; the recipient is not."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This is a normal transfer to the recipient, so there is nothing unusual to worry about."
+   },
+   "expected": "hide_note",
+   "error": "note_safe",
+   "why": "Calls the transfer normal and nothing to worry about."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "You would receive a large amount of this token from the address shown, and the transfer is final once confirmed."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The user sends the token; the note has the user receiving it."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a direct transfer of a large share of this token from your wallet to the recipient.",
+    "checks": [
+     "Is the recipient address exactly the address you meant to pay?",
+     "Is the amount what you intended to send?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Plain transfer of a verified token matches no listed scam shape."
+  },
+  {
+   "scenario": "arbPayment",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a permission that lets the recipient take this token from your wallet later.",
+    "checks": [
+     "Is the recipient address exactly the address you meant to pay?",
+     "Is the amount what you intended to send?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_wrong_kind",
+   "why": "Summary describes a payment as a spending permission."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This token goes from your wallet to the recipient, and once confirmed the transfer is final."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Token transfer to another address: payment, another party, out, limited."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "If the recipient address is wrong, the token you send is gone for good."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; no amount, network or address."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming moves this token from your wallet straight to the recipient, and the transfer is permanent."
+   },
+   "expected": "show",
+   "error": null,
+   "why": "All fields right; plain and scoped."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "does_not_apply",
+    "reasons": [
+     1
+    ],
+    "note": "This token goes from your wallet to the recipient, and once confirmed the transfer is final."
+   },
+   "expected": "hide_all",
+   "error": "field_limit",
+   "why": "For a payment, limit is limited."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "This gives the recipient permission to take this token from your wallet."
+   },
+   "expected": "hide_note",
+   "error": "note_wrong_kind",
+   "why": "Describes a direct payment as a permission."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "The recipient would send this token to you, and the transfer is final once confirmed."
+   },
+   "expected": "hide_note",
+   "error": "note_role_swap",
+   "why": "The user pays the recipient, not the reverse."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "explain",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "reasons": [
+     1
+    ],
+    "note": "Confirming sends everything in your wallet to the recipient, and the transfer is final."
+   },
+   "expected": "hide_note",
+   "error": "note_scope",
+   "why": "Only a set amount of this token is sent, not the whole wallet."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a direct transfer of this token from your wallet to the recipient.",
+    "checks": [
+     "Is the recipient address exactly the address you meant to pay?",
+     "Is the amount what you agreed to pay?"
+    ]
+   },
+   "expected": "show",
+   "error": null,
+   "why": "Plain transfer of a verified token matches no listed scam shape."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "fake_token",
+    "summary": "This is a direct transfer of this token from your wallet to the recipient.",
+    "checks": [
+     "Is the recipient address exactly the address you meant to pay?",
+     "Is the amount what you agreed to pay?"
+    ]
+   },
+   "expected": "hide",
+   "error": "field_pattern",
+   "why": "The token is a verified contract; nothing points to a fake token."
+  },
+  {
+   "scenario": "polygonPayment",
+   "form": "deep",
+   "answer": {
+    "action": "payment",
+    "who_gains": "another_party",
+    "direction": "out_of_your_wallet",
+    "limit": "limited",
+    "pattern": "no_known_pattern",
+    "summary": "This is a transfer in which the recipient sends this token to your wallet.",
+    "checks": [
+     "Is the recipient address exactly the address you meant to pay?",
+     "Is the amount what you agreed to pay?"
+    ]
+   },
+   "expected": "hide",
+   "error": "note_role_swap",
+   "why": "Summary has the recipient paying the user."
+  }
+ ]
+}

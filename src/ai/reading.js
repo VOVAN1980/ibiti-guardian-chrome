@@ -23,7 +23,10 @@
 // model's words are also checked for the claims code can recognise (src/ai/
 // guard.js): "safe", "verified", "unlimited", "you get the permission".
 
-import { answerChecker, isUndecoded } from './guard.js';
+import { BRANDS, NEGATED, NETWORKS, answerChecker, isUndecoded } from './guard.js';
+
+// Words that turn a "normal …" into a warning.
+const SCAM = 'scam|drainer|trick|attack|fraud|phishing|theft|lure|tactic|scheme|ploy|trap|bait|red flag|sign of|warning sign';
 
 export const ACTIONS = [
   'spending_permission',
@@ -89,7 +92,8 @@ export const PATTERNS = {
   },
   risky_action_in_a_batch: {
     label: 'Matches a known scam pattern: a risky action hidden among others in one confirmation',
-    fits: (r) => r.kind === 'batch' && (r.parts || []).some((p) => p.risk === 'danger'),
+    // At least one part that is not ordinary.
+    fits: (r) => r.kind === 'batch' && (r.parts || []).length > 1 && r.parts.some((p) => p.risk !== 'info'),
   },
   no_known_pattern: {
     label: 'No known scam pattern matched. That alone does not make it safe',
@@ -120,7 +124,7 @@ export const READING_GUIDE = [
   `- action: what kind of request this is: ${ACTIONS.join(', ')}.`,
   '- who_gains: who could move or receive the user\'s assets if the user confirms: another_party, you (the user), or nobody.',
   '- direction: which way the user\'s own assets can move as a result: out_of_your_wallet, into_your_wallet, or nothing_moves.',
-  '- limit: for a spending permission, unlimited or limited; for a payment, limited; for access to a whole collection, unlimited; otherwise does_not_apply.',
+  '- limit: for a spending permission, unlimited or limited (unlimited if any token in it is unlimited); for a payment, limited; for access to a whole collection, unlimited; for several actions, unlimited if any of them is, otherwise limited; otherwise does_not_apply.',
 ].join('\n');
 export const REASONS_GUIDE =
   '- reasons: the numbers of the one or two most important lines under "Why it matters", most important first.';
@@ -165,26 +169,28 @@ function readingOf(result) {
       // One-time: the spender takes the amount once. Either word fits it.
       return field(['spending_permission', 'payment'], OTHER, OUT, [s.unlimited ? 'unlimited' : 'limited']);
     case 'permit2Batch': {
-      const all = (s.actions || []).every((a) => a && a.unlimited);
+      // Unlimited if any token in it is: "limited" would hide that one.
       const any = (s.actions || []).some((a) => a && a.unlimited);
       return field(
         s.once ? ['spending_permission', 'payment'] : ['spending_permission'],
         OTHER,
         OUT,
-        all ? ['unlimited'] : any ? ['unlimited', 'limited'] : ['limited'],
+        any ? ['unlimited'] : ['limited'],
       );
     }
     case 'approveAll':
-      return field(['collection_access'], OTHER, OUT, ['unlimited', 'does_not_apply']);
+      return field(['collection_access'], OTHER, OUT, ['unlimited']);
     case 'transfer':
     case 'nativeTransfer': {
       if (s.empty) return field(['payment'], ['nobody', 'another_party'], ['nothing_moves'], ['does_not_apply', 'limited']);
-      const limit = ['limited', 'does_not_apply'];
+      const limit = ['limited'];
       if (s.fromSelf === false) {
-        // Someone else's tokens, moved with their permission.
+        // Someone else's tokens, moved with their permission: none of the
+        // user's own assets move. The recipient gains them, so either
+        // reading of who gains is right; "you" is not, unless they come here.
         return s.toSelf
           ? field(['payment'], ['you'], ['into_your_wallet'], limit)
-          : field(['payment'], OTHER, ['nothing_moves'], limit);
+          : field(['payment'], ['nobody', 'another_party'], ['nothing_moves'], limit);
       }
       // To another address of this same wallet.
       if (s.toSelf) return field(['payment'], ['you'], ['out_of_your_wallet', 'nothing_moves'], limit);
@@ -206,7 +212,14 @@ function readingOf(result) {
       const parts = (result.parts || []).map(decodedReading);
       if (parts.length === 0 || parts.some((p) => p === null)) return null;
       const leaves = parts.some((p) => p.direction.includes('out_of_your_wallet'));
-      return field(['several_actions'], leaves ? OTHER : ['nobody'], leaves ? OUT : ['nothing_moves'], LIMITS);
+      // Unlimited if any action is; otherwise limited (or, read literally, not a matter of amount).
+      const unlimited = parts.some((p) => p.limit.length === 1 && p.limit[0] === 'unlimited');
+      return field(
+        ['several_actions'],
+        leaves ? OTHER : ['nobody'],
+        leaves ? OUT : ['nothing_moves'],
+        unlimited ? ['unlimited'] : ['limited', 'does_not_apply'],
+      );
     }
     default:
       return null;
@@ -295,10 +308,27 @@ export function wordsProblem(text, result, codeSentence, options = {}) {
   const t = String(text || '').trim();
   if (!t) return { problem: 'nothing', detail: '' };
   if (t.length > MAX_CHARS) return { problem: 'too much text', detail: `${t.length} characters` };
-  const name = namesIn(t);
+  const name = namesIn(t) || namedIn(t, result);
   if (name) return { problem: 'a name, number or address of its own', detail: name };
   const verdict = answerChecker(result, codeSentence, options).finish(t);
-  return verdict.problem ? { problem: verdict.problem, detail: verdict.detail || '' } : null;
+  if (verdict.problem) return { problem: verdict.problem, detail: verdict.detail || '' };
+  return contradicts(t, result, { advice: Boolean(options.advice) });
+}
+
+/** A network, a well-known app, or a name the request itself carries. */
+function namedIn(text, result) {
+  for (const [, re] of NETWORKS) {
+    const m = re.exec(text);
+    if (m) return m[0];
+  }
+  const brand = new RegExp(BRANDS.source).exec(text);
+  if (brand) return brand[0];
+  for (const f of result.facts) {
+    if ((f.label === 'App' || f.label === 'Sign-in for') && f.value.length >= 3 && text.toLowerCase().includes(f.value.toLowerCase())) {
+      return f.value;
+    }
+  }
+  return null;
 }
 
 /**
@@ -316,6 +346,154 @@ export function parseAnswer(text) {
   } catch {
     return null;
   }
+}
+
+// ── The note against the reading code has verified ─────────────────────────
+//
+// Once the form matches, code knows what kind of request it is, who gains,
+// which way assets move and whether it is limited. The model's words may not
+// say otherwise: these checks compare them with those verified values.
+
+const CLAUSE = /[,;()]|:(?!\d)|\s[-–—]\s|[.!?]\s/;
+// Words that turn what follows into its opposite, or into a comparison.
+const TURNS = /\b(?:no longer|without|unlike|look(?:s|ing)?\s+like|disguised\s+as|pos(?:e|es|ing)\s+as|pretend\w*|rather\s+than|than)\b/i;
+/** Whether the words right before `at`, in the same clause, deny it. */
+const denied = (text, at) => {
+  const before = text.slice(0, at).split(CLAUSE).pop();
+  return NEGATED.test(before) || TURNS.test(before);
+};
+/**
+ * The first match of `re` in `text` that is not denied, or null. `undone`:
+ * words that, earlier in the clause, make it about something taken back
+ * ("cancels a permission that let the operator move …").
+ */
+function said(text, re, undone = null) {
+  for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) {
+    if (denied(text, m.index)) continue;
+    if (undone && undone.test(text.slice(0, m.index).split(/[.!?]\s/).pop())) continue;
+    return m[0];
+  }
+  return null;
+}
+const UNDONE = /\b(?:cancel\w*|remov\w*|revok\w*|tak(?:e|es|ing)\s+away|ends?|ending|withdraw\w*|stops?|stopping|previously|before|earlier|already\s+gave)\b/i;
+
+// Reassurance: never, whatever the request (Guardian says "no red flags
+// found", never "safe" or "normal").
+const REASSURES = [
+  /\bnothing\s+(?:\w+\s+){0,2}?(?:to\s+worry|(?:can|could|will|would)\s+go\s+wrong|bad\s+(?:can|could|will))\b/i,
+  /\b(?:little|not much|hardly anything)\s+(?:that\s+)?(?:can|could|will|would)\s+go\s+wrong\b/i,
+  /\b(?:no|little|nothing|without)\s+(?:\w+\s+)?(?:reason\s+)?(?:to\s+)?(?:worry|fear|concern)\b/i,
+  /\b(?:no|low|little|minimal|zero|small|tiny)[- ](?:risk|danger)\b/i,
+  /\b(?:less|not(?:\s+(?:very|that|so|too))?)\s+serious\b|\bnot\s+a\s+big\s+deal\b|\b(?:minor|trivial|negligible|harmless|innocent|innocuous)\b(?![- ]looking)/i,
+  new RegExp(
+    String.raw`\b(?:is|just|simply|only|merely)\s+(?:a|an)\s+(?:\w+\s+)?(?:normal|standard|routine|ordinary|typical|common|usual|everyday|regular|simple|basic)\b(?!\s+(?:\w+\s+)?(?:${SCAM})s?\b)`,
+    'i',
+  ),
+  /\b(?:normal|standard|routine|ordinary|typical|usual|everyday)\s+(?:sign[- ]?in|login|log[- ]in|approval|permission|payment|transfer|request|signature|transaction|step)\b/i,
+];
+
+// What the words say about the kind of request.
+const SIGN_IN_WORDS = /\b(?:signs?\s+you\s+in|logs?\s+you\s+in|sign(?:ing)?[- ]in|log(?:ging)?[- ]?in|proves?\s+(?:that\s+)?(?:you\s+own|the\s+wallet\s+is\s+yours|this\s+wallet\s+is\s+yours|wallet\s+ownership))\b/i;
+const GRANTS = /\b(?:gives?|giving|grants?|granting|hands?)\s+(?:\w+\s+){0,3}?(?:access|permission|control|the\s+right)\b|\b(?:lets?|allows?|allowing|enables?)\s+(?:\w+\s+){0,3}?(?:to\s+)?(?:take|move|spend|use|transfer|pull)\b/i;
+const PERMISSION_WORDS = /\b(?:permission|approval|allowance|authori[sz](?:e|es|ation)|take\s+(?:\w+\s+){0,3}?later)\b/i;
+
+// What the words say about where assets go.
+const INCOMING = [
+  /\b(?:you|your\s+wallet|this\s+(?:address|wallet|account))\s+(?:would\s+|will\s+|could\s+|may\s+)?(?:also\s+)?(?:receive|gain|earn|collect)s?\b/i,
+  /\b(?:come|comes|coming|arrive|arrives|land|lands|flow|flows)\s+(?:back\s+)?(?:in)?to\s+(?:you\b|your\s+(?:wallet|address|account)|this\s+(?:address|wallet|account))/i,
+  /\b(?:come|comes|coming)\s+into\b/i,
+  /\b(?:adds?|added|adding|deposits?|deposited|credits?|credited)\s+(?:\w+\s+){0,4}?(?:to|into|in)\s+(?:your|this)\s+(?:wallet|address|account)\b/i,
+  /\b(?:sent|paid|transferred|given)\s+(?:back\s+)?to\s+you\b/i,
+];
+const OUTGOING = [
+  /\b(?:takes?|taking|charges?|deducts?|removes?|sends?|moves?|pulls?|withdraws?|spends?|costs?)\s+(?:\w+\s+){0,4}?(?:out\s+of|from)\s+your\s+(?:wallet|account|balance)\b/i,
+  /\b(?:leave|leaves|leaving)\s+your\s+(?:wallet|account)\b/i,
+];
+
+// Smaller than it is.
+const SMALL = /\b(?:small|tiny|limited|capped|fixed|set|modest|certain|specific|restricted)\s+(?:amount|sum|number|portion|part|quantity)\b|\bcapped\b|\bup\s+to\s+a\s+(?:limit|cap|maximum)\b|\bwith\s+a\s+(?:limit|cap)\b|\bsome\s+of\s+(?:this|the|your)\b/i;
+// "Once you confirm" is a conjunction, not "one time".
+// "At once" means "right away".
+const ONE_TIME = /\b(?:a\s+single\s+time|one\s+time|one-time|single[- ]use|one\s+use|used\s+up|only\s+once|just\s+once|(?<!\bat\s)once(?!\s+(?:you|it|this|that|signed|confirmed|approved|the|they|someone|anyone|submitted|used))|expires?\s+(?:right\s+away|immediately|soon|shortly|quickly)|for\s+a\s+short\s+(?:time|while)|temporar(?:y|ily))\b/i;
+const LASTING = /\b(?:until\s+you\s+revoke|stays?\s+(?:active|in\s+place|valid)\s+until\s+you|forever|permanent(?:ly)?|again\s+and\s+again|repeatedly|as\s+many\s+times)\b/i;
+const NOW_ONLY = /\bcurrently\b(?!\s+(?:or|and)\b)|\b(?:you|that\s+you)\s+(?:already\s+)?(?:hold|have|own)\s+(?:right\s+)?now\b(?!\s*,?\s*(?:or|and)\s)|\bat\s+the\s+moment\b|\balready\s+(?:hold|have|own)\b(?![^.]{0,40}\b(?:later|future)\b)/i;
+const ONLY = /\b(?:only|just|merely|simply)\s+(?:gives?|lets?|allows?|grants?|sends?|approves?|moves?|a|an|this|the)\b|\bnothing\s+(?:more|else)\b/i;
+
+/**
+ * Whether the model's words contradict what code verified, or play it down.
+ * @param {string} text
+ * @param {object} result  the analyzer's result
+ * @returns {{problem: string, detail: string}|null}
+ */
+export function contradicts(text, result, { advice = false } = {}) {
+  const decoded = decodedReading(result);
+  if (!decoded) return null;
+  const s = result.subject || {};
+  const one = (values, value) => values.length === 1 && values[0] === value;
+  const fail = (problem, detail) => ({ problem, detail });
+
+  for (const re of REASSURES) {
+    const m = said(text, re);
+    if (m) return fail('wording that plays down the risk', m);
+  }
+
+  // The kind of request.
+  const action = decoded.action;
+  if (!action.includes('sign_in') && !action.includes('sign_text')) {
+    const m = said(text, SIGN_IN_WORDS);
+    if (m) return fail('a different kind of request', m);
+  }
+  if (action.includes('remove_permission') || action.includes('sign_in') || action.includes('sign_text')) {
+    const m = said(text, GRANTS, action.includes('remove_permission') ? UNDONE : null);
+    if (m) return fail('a different kind of request', m);
+  }
+  if (one(action, 'payment') && s.fromSelf !== false) {
+    const m = said(text, PERMISSION_WORDS) || said(text, GRANTS);
+    if (m) return fail('a different kind of request', m);
+  }
+
+  // Where assets go.
+  if (!decoded.direction.includes('into_your_wallet')) {
+    for (const re of INCOMING) {
+      const m = said(text, re);
+      if (m) return fail('a different direction for the assets', m);
+    }
+  }
+  if (!decoded.direction.includes('out_of_your_wallet')) {
+    // A revoke is a transaction: its network fee does leave the wallet.
+    const fee = (m) => /\b(?:fee|gas)\b/i.test(m) && (s.action === 'revoke' || s.action === 'revokeAll');
+    for (const re of OUTGOING) {
+      const m = said(text, re);
+      if (m && !fee(m)) return fail('a different direction for the assets', m);
+    }
+  }
+
+  // How much, how long, how many things.
+  // (A thing to check may suggest a smaller amount: "would a capped amount do?")
+  if (one(decoded.limit, 'unlimited') && !advice) {
+    const m = said(text, SMALL);
+    if (m) return fail('wording that makes it smaller than it is', m);
+  }
+  const once = s.action === 'permitTransfer' || (s.action === 'permit2Batch' && s.once);
+  const lasting = ['approve', 'approveAll'].includes(s.action) || (s.action === 'permit2Batch' && !s.once);
+  if (lasting && !/^only\b/.test(s.lasts || '')) {
+    const m = said(text, ONE_TIME);
+    if (m) return fail('wording that makes it smaller than it is', m);
+  }
+  if (once) {
+    const m = said(text, LASTING);
+    if (m) return fail('a different duration', m);
+  }
+  if (s.action === 'approveAll') {
+    const m = said(text, NOW_ONLY);
+    if (m) return fail('wording that makes it smaller than it is', m);
+  }
+  // Coins on top of a token call, or several actions: "only" leaves some out.
+  if (!advice && (s.coins || (s.action === 'batch' && (s.actions || []).length > 1))) {
+    const m = said(text, ONLY);
+    if (m) return fail('wording that makes it smaller than it is', m);
+  }
+  return null;
 }
 
 // ── The whole check, as the window runs it ─────────────────────────────────
@@ -383,7 +561,7 @@ export function checkAnalysis(text, result, { sentence = '', own = [], chainId =
     .map((item) => String(item).replace(/^\s*\d{1,2}[.)]\s+/, '').trim())
     .filter(Boolean);
   for (const piece of [summary, ...checks]) {
-    const failed = wordsProblem(piece, result, sentence, { own, chainId, host });
+    const failed = wordsProblem(piece, result, sentence, { own, chainId, host, advice: piece !== summary });
     if (failed) return { passed: false, problem: failed.problem, detail: failed.detail };
   }
   return { passed: true, summary, checks, pattern: answer.pattern };
