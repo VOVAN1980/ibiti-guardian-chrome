@@ -10,6 +10,7 @@
 // GitHub. Output: dist/judges/ and dist/IBITI-Guardian-judges.zip (dist/ is ignored).
 
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -76,9 +77,16 @@ for our free Firebase project. Source: https://github.com/VOVAN1980/ibiti-guardi
 );
 
 await rm(ZIP, { force: true });
-execFileSync('powershell.exe', ['-NoProfile', '-Command', `Compress-Archive -Path '${OUT}\\*' -DestinationPath '${ZIP}'`], {
-  stdio: 'inherit',
-});
+// Windows' own tar (bsdtar) writes zip entries with "/" like every other zip
+// tool. PowerShell's Compress-Archive writes "icons\icon16.png": unzipped on
+// macOS or Linux that is a file with a backslash in its name, the icons
+// folder is missing and Chrome refuses to load the extension.
+const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+execFileSync(tar, ['-a', '-c', '-f', path.resolve(ZIP), ...(await readdir(OUT))], { cwd: OUT, stdio: 'inherit' });
+const listing = execFileSync(tar, ['-t', '-f', path.resolve(ZIP)], { encoding: 'utf8' });
+if (listing.includes('\\') || !/^icons\/icon16\.png$/m.test(listing) || !/^manifest\.json$/m.test(listing)) {
+  throw new Error(`The archive's paths are not portable:\n${listing}`);
+}
 console.log(`\n${ZIP} ready (version ${version}).`);
 
 // The download for the judges: site-private/ is served by the hosted demo
