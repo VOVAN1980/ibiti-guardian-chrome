@@ -528,3 +528,97 @@ test('what the button promised: code reads plain words, Gemini only the unclear 
   assert.equal(geminiOffer(pressedOn('claim', 'Claim airdrop'), 'swap'), null, 'code read the button: Gemini is not asked to');
   assert.equal(geminiOffer(R.claim, 'receive'), null, 'no button pressed');
 });
+
+test('the button check, after the review of 2026-11-18: revoke phrases, lure words, paid calls, facts order, addresses', async () => {
+  const { offersOf, cleanPromise } = await import('../src/analyzer/promise.js');
+  const { geminiOffer } = await import('../src/ai/reading.js');
+  const press = (button, extra = {}) => ({ button, title: 'Rewards', heading: 'Claim your tokens', ageMs: 300, ...extra });
+  const on = (name, button) => analyze({ ...RECORDS[name], promise: press(button) });
+  const clashOf = (r) => r.subject.promise.clash;
+  // What a revoke button names is what it removes, not an offer to approve.
+  for (const button of [
+    'Revoke approval',
+    'Remove approval',
+    'Remove approvals',
+    'Cancel approval',
+    'Revoke permission',
+    'Remove permission',
+    'Revoke all approvals',
+    'Remove USDC approval',
+    'Cancel spending permission',
+    'Remove unlimited approvals',
+    'Cancel USDC approval',
+    'Revoke permit',
+    'Remove risky approvals',
+  ]) {
+    assert.deepEqual(offersOf(button), ['revoke'], button);
+    assert.equal(on('limited', button).risk, 'danger', `${button} on a permission`);
+  }
+  assert.deepEqual(offersOf('Revoke and approve'), ['revoke', 'approve'], 'an approve verb still counts');
+  assert.equal(clashOf(on('limited', 'Revoke and approve')), false);
+  // Only verbs approve: nouns never do, and a verb with other meanings only
+  // at the start of the button or of a clause.
+  for (const [name, button] of [
+    ['permit', 'Connect wallet to check approvals'],
+    ['permit', 'Connect to scan approvals'],
+    ['order', 'Verify permissions'],
+    ['permit', 'Claim (no approvals needed)'],
+    ['limited', 'Claim grant'],
+    ['limited', 'You’re on the list! Claim now'],
+  ]) {
+    assert.equal(clashOf(on(name, button)), true, `${button} on ${name}`);
+  }
+  for (const button of ['Claim and sell', 'Connect & enable USDC', 'Unlock rewards', 'Enable USDC', 'Approve and claim', 'Give permission (you can revoke it anytime)']) {
+    assert.equal(clashOf(on('limited', button)), false, `${button} on a permission`);
+  }
+  assert.deepEqual(offersOf('Check approvals'), [], 'unclear: Gemini reads it');
+  assert.equal(clashOf(on('transfer', 'Approve')), false, 'a lone approve is never a contradiction');
+  assert.equal(clashOf(on('transfer', 'Approve and claim')), true, 'approving is not sending');
+  // Where code is not sure, it says nothing and Gemini may read the words:
+  // "Unlock rewards" on a payment may be paying to unlock something.
+  for (const button of ['Unlock rewards', 'Unlock bonus content']) {
+    const r = on('transfer', button);
+    assert.equal(r.risk, R.transfer.risk, button);
+    assert.equal(r.subject.promise.offer, null, button);
+  }
+  assert.match(geminiOffer(on('transfer', 'Unlock rewards'), 'receive'), /^Gemini reads the button you pressed, “Unlock rewards”, as an offer to receive something, but this request sends 0\.01 ETH out of your wallet\.$/);
+  assert.equal(geminiOffer(on('transfer', 'Unlock bonus content'), 'pay'), null);
+  // Words for paying to get something are left to Gemini, except against a
+  // marketplace order for the user's own items, which no purchase needs.
+  for (const button of ['Redeem', 'Collect', 'Enter to win']) {
+    assert.equal(on('limited', button).risk, 'info', button);
+    assert.equal(on('limited', button).subject.promise.offer, null, button);
+    assert.equal(clashOf(on('order', button)), true, `${button} on a marketplace order`);
+  }
+  // A sign-in or a revoke never sends coins; a claim may cost a fee.
+  const payable = tx(ATTACKER, '0x5fba79f5', '0xde0b6b3a7640000', { balance: '0xde0b6b3a7640000' });
+  const paid = (button) => analyze({ ...payable, promise: press(button) });
+  assert.match(paid('Connect wallet').warnings[0], /^The button you pressed said “Connect wallet”, an offer to sign in or verify the wallet, but this request sends 1 ETH to a contract call Guardian cannot read\.$/);
+  assert.equal(paid('Connect wallet').risk, 'danger');
+  assert.equal(clashOf(paid('Revoke')), true);
+  assert.equal(clashOf(paid('Claim airdrop')), false, 'a claim may cost a fee');
+  assert.equal(clashOf(analyze({ ...tx(ATTACKER, '0x5fba79f5'), promise: press('Connect wallet') })), false, 'no coins, no contradiction');
+  // The pressed button comes after the action, or after every numbered action or token.
+  const where = (r) => r.facts.findIndex((f) => f.label === 'Button pressed');
+  const numbered = (r) => r.facts.filter((f) => /^(?:Action|Token) \d+$/.test(f.label)).length;
+  for (const name of ['batchOk', 'batchUnknown', 'permitBatch']) {
+    const r = on(name, 'Continue');
+    assert.ok(numbered(r) > 1, name);
+    assert.equal(where(r), numbered(r), `${name}: after all ${numbered(r)} numbered facts`);
+  }
+  assert.equal(where(on('limited', 'Continue')), 1, 'right after the action');
+  // Addresses in the site's words go before anything is cut short.
+  const own = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+  const seen = cleanPromise(press('Continue', { title: `Positions, rewards and recent activity for wallet ${own}`, heading: 'Rewards for 0x71C7…976F' }));
+  assert.equal(seen.title, 'Positions, rewards and recent activity for wallet an address');
+  assert.equal(seen.heading, 'Rewards for an address');
+  assert.equal(cleanPromise(press('Send to 0x71c7...976f')).button, 'Send to an address');
+  for (const short of ['0x11…1111', '0x111…1111', '0x71C7••••976F', '0x71C7....976F', '0x71C7⋯976F', '0x71C7…976F']) {
+    assert.equal(cleanPromise(press(`Rewards for ${short}`)).button, 'Rewards for an address', short);
+  }
+  assert.equal(cleanPromise(press('0x1234 · Add funds')).button, 'an address · Add funds', 'the words after it stay');
+  assert.ok(!/[0-9a-f]{6}/i.test(JSON.stringify(seen)), 'no part of the address is left');
+  // The in-page guard takes them out with the same pattern, before it cuts.
+  const pattern = (file) => readFileSync(new URL(file, import.meta.url), 'utf8').match(/const ADDRESS = (.*);/)[1];
+  assert.equal(pattern('../src/inpage.js'), pattern('../src/analyzer/promise.js'));
+});

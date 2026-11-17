@@ -189,8 +189,9 @@ pickEl.addEventListener('change', () => {
 function report(entry) {
   state.last = entry;
   state.history.push(entry);
+  // The button's words when it was pressed (the card's can change meanwhile).
   const button = document.querySelector(`[data-scenario="${entry.scenario}"]`);
-  const name = button ? button.textContent.trim() : entry.scenario;
+  const name = entry.name || (button ? button.textContent.trim() : entry.scenario);
   const line = document.createElement('div');
   if (entry.ok) {
     line.className = `line ${guarded ? 'passed' : 'unguarded'}`;
@@ -211,10 +212,10 @@ function report(entry) {
   logEl.prepend(line);
 }
 
-async function run(scenario) {
+async function run(scenario, name) {
   const wallet = currentWallet();
   if (!wallet) {
-    report({ scenario, ok: false, message: 'No wallet found.' });
+    report({ scenario, name, ok: false, message: 'No wallet found.' });
     return;
   }
   const provider = wallet.provider;
@@ -230,6 +231,7 @@ async function run(scenario) {
     if (!TESTNETS[chainId]) {
       report({
         scenario,
+        name,
         ok: false,
         code: 'not sent',
         message: `${wallet.info.name} is on ${chainName(chainId)}. Switch it to a test network first: the demo sends nothing to a real network.`,
@@ -241,9 +243,9 @@ async function run(scenario) {
     const request = SCENARIOS[scenario]();
     state.sent = JSON.parse(JSON.stringify(request)); // what the site asked for
     const result = await provider.request(request);
-    report({ scenario, ok: true, result });
+    report({ scenario, name, ok: true, result });
   } catch (error) {
-    report({ scenario, ok: false, code: error && error.code, message: String((error && error.message) || error) });
+    report({ scenario, name, ok: false, code: error && error.code, message: String((error && error.message) || error) });
   }
 }
 
@@ -264,7 +266,7 @@ if (ownLabel && ownKind && ownPress) {
 }
 
 for (const button of document.querySelectorAll('[data-scenario]')) {
-  button.addEventListener('click', () => run(button.dataset.scenario));
+  button.addEventListener('click', () => run(button.dataset.scenario, button.textContent.trim()));
 }
 
 // ── Real wallets: connect first, and prefer a test network ────────────────

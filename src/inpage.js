@@ -113,44 +113,69 @@
   // form fields, no page text. A click the page makes itself (isTrusted
   // false) does not count. Natives are taken now, before page scripts run.
   const closest = Element.prototype.closest;
-  const querySel = Element.prototype.querySelector;
+  const queryAll = Element.prototype.querySelectorAll;
   const docQuery = Document.prototype.querySelector;
+  const position = Node.prototype.compareDocumentPosition;
+  const FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
   const innerTextOf = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
   const titleOf = Object.getOwnPropertyDescriptor(Document.prototype, 'title').get;
   const parentOf = Object.getOwnPropertyDescriptor(Node.prototype, 'parentElement').get;
   const now = Date.now;
   const PRESSABLE = 'button, a, [role="button"], input[type="submit"], input[type="button"], summary';
+  // Any address in the site's words, whole or shortened ("0x71C7…976F"), is
+  // taken out before the words are cut short: a cut address could no longer
+  // be recognised later, and the user's own may be among them.
+  const ADDRESS = /0x[0-9a-fA-F]{2,}(?:[.…·•⋯‥*]+|-{2,})[0-9a-fA-F]{2,}|0x[0-9a-fA-F]{4,}|\b[0-9a-fA-F]{40}\b/g;
   const words = (value) =>
     typeof value === 'string'
       ? value
+          .slice(0, 2000)
+          .replace(ADDRESS, 'an address')
           .replace(/\s+/g, ' ')
           .trim()
           .slice(0, 80)
       : '';
   let lastPress = null;
 
+  /** What a trusted click pressed: its words and where, or null. */
+  function pressOf(target) {
+    if (!(target instanceof ElementCtor)) return null;
+    const el = apply(closest, target, [PRESSABLE]);
+    if (!el) return null;
+    const button =
+      words(apply(innerTextOf, el, [])) ||
+      words(el.value) ||
+      words(apply(getAttr, el, ['aria-label'])) ||
+      words(apply(getAttr, el, ['title']));
+    if (!button) return null;
+    // The nearest heading above the button: in the closest ancestor that has
+    // one before it in the page.
+    let heading = '';
+    for (let node = apply(parentOf, el, []), depth = 0; node && depth < 6 && !heading; node = apply(parentOf, node, []), depth++) {
+      const found = apply(queryAll, node, ['h1, h2, h3']);
+      for (let i = found.length - 1; i >= 0; i--) {
+        if (apply(position, found[i], [el]) & FOLLOWING) {
+          heading = words(apply(innerTextOf, found[i], []));
+          break;
+        }
+      }
+    }
+    if (!heading) {
+      const h1 = apply(docQuery, doc, ['h1']);
+      if (h1) heading = words(apply(innerTextOf, h1, []));
+    }
+    return { button, title: words(apply(titleOf, doc, [])), heading, at: now() };
+  }
+
   function pressed(event) {
+    // The second click of a double click is the same press (the button may
+    // already show a spinner instead of its words).
+    if (!event.isTrusted || event.detail > 1) return;
+    // Every real click replaces the last press, so an earlier button is never
+    // shown for a request that followed a click on something else.
+    lastPress = null;
     try {
-      if (!event.isTrusted || !(event.target instanceof ElementCtor)) return;
-      const el = apply(closest, event.target, [PRESSABLE]);
-      if (!el) return;
-      const button =
-        words(apply(innerTextOf, el, [])) ||
-        words(el.value) ||
-        words(apply(getAttr, el, ['aria-label'])) ||
-        words(apply(getAttr, el, ['title']));
-      if (!button) return;
-      // The nearest heading: inside the closest ancestor that has one.
-      let heading = '';
-      for (let node = apply(parentOf, el, []), depth = 0; node && depth < 6 && !heading; node = apply(parentOf, node, []), depth++) {
-        const h = apply(querySel, node, ['h1, h2, h3']);
-        if (h) heading = words(apply(innerTextOf, h, []));
-      }
-      if (!heading) {
-        const h1 = apply(docQuery, doc, ['h1']);
-        if (h1) heading = words(apply(innerTextOf, h1, []));
-      }
-      lastPress = { button, title: words(apply(titleOf, doc, [])), heading, at: now() };
+      lastPress = pressOf(event.target);
     } catch {
       // Whatever the page did to its own DOM, the review goes on without it.
     }

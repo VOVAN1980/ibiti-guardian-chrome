@@ -186,7 +186,7 @@ function showSent(prompt, sent) {
  * Gemini Nano's answer did not pass Guardian's check (`afterNano`). The same
  * permission covers both, and says so.
  */
-function offerFallback(result, host, { afterNano = false } = {}) {
+function offerFallback(result, host, { afterNano = false, nanoProblem = '' } = {}) {
   if (!cloudReady) return;
   if (isPreview) {
     $('local-fallback-note').textContent =
@@ -205,7 +205,7 @@ function offerFallback(result, host, { afterNano = false } = {}) {
     $('local-fallback').hidden = true;
     $('local-download').hidden = true;
     // Gemini Nano has already answered this one: only the cloud is asked now.
-    await runLocal(result, host, { cloudOnly: afterNano });
+    await runLocal(result, host, { cloudOnly: afterNano, nanoProblem });
   };
 }
 
@@ -277,20 +277,29 @@ const differed = (problem) => problem.replace(/^a different reading of the reque
  */
 function waiting(note, what) {
   const since = performance.now();
+  // The note is in a live region: a screen reader hears it once, not the
+  // seconds every second.
+  const count = document.createElement('span');
+  count.setAttribute('aria-hidden', 'true');
+  note.replaceChildren(`${what}: `, count, ' You can decide without it.');
   const tick = () => {
-    const s = Math.floor((performance.now() - since) / 1000);
-    note.textContent = `${what}: ${s} s so far. You can decide without it.`;
+    count.textContent = `${Math.floor((performance.now() - since) / 1000)} s so far.`;
   };
   tick();
   const timer = setInterval(tick, 1000);
   return () => clearInterval(timer);
 }
 
+const NO_ANSWER = 'no answer within 90 seconds';
+/** Why Gemini Nano's answer was not used, as a sentence's start. */
+const nanoNotUsed = (problem) =>
+  problem === NO_ANSWER ? 'Gemini Nano did not answer within 90 seconds' : 'Gemini Nano’s answer did not pass Guardian’s check';
+
 /** What went wrong with a model's answer, after its name: "gave no usable answer", … */
 const failure = (problem) =>
   problem === 'no usable answer'
     ? 'gave no usable answer'
-    : problem === 'no answer within 90 seconds'
+    : problem === NO_ANSWER
       ? 'did not answer within 90 seconds'
       : `read the request differently from Guardian’s decoder (${differed(problem)})`;
 
@@ -344,7 +353,7 @@ function showCheck(box, textEl, text) {
  * `cloudOnly`: Gemini Nano has already answered this request and its reading
  * did not match; the user has just allowed the cloud, so only the cloud is asked.
  */
-async function runLocal(result, host, { cloudOnly = false } = {}) {
+async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = {}) {
   const text = $('local-text');
   const note = $('local-note');
   const meta = $('local-meta');
@@ -444,7 +453,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
         run.catch(() => {});
         // No answer in time: the same as an answer that did not pass.
         out = { text: '', ms: DEVICE_TIMEOUT_MS, source: 'on_device', timedOut: true };
-        verdict = { checked: 'withheld', words: '', top: [], offer: null, problem: 'no answer within 90 seconds', detail: '' };
+        verdict = { checked: 'withheld', words: '', top: [], offer: null, problem: NO_ANSWER, detail: '' };
       }
     }
     // Gemini Nano's reading did not match the decoder. With the user's
@@ -452,7 +461,12 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     if (verdict.checked !== 'passed' && out.source === 'on_device' && hybrid) {
       nano = { out, verdict };
       stopWaiting();
-      stopWaiting = waiting(note, 'Gemini Nano’s answer did not pass Guardian’s check. Gemini in the cloud is reading it once more, as you allowed');
+      stopWaiting = waiting(
+        note,
+        verdict.problem === NO_ANSWER
+          ? 'Gemini Nano did not answer within 90 seconds. Gemini in the cloud is reading the request instead, as you allowed'
+          : 'Gemini Nano’s answer did not pass Guardian’s check. Gemini in the cloud is reading it once more, as you allowed',
+      );
       run = readInCloud(prompt, { signal: stop.signal });
       out = await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
       verdict = checkExplanation(out.text, result, { shown });
@@ -468,13 +482,14 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     const onDeviceRun = out.source === 'on_device';
     const model = onDeviceRun ? 'Gemini Nano on your computer' : 'Gemini in the cloud';
     const nanoFirst = nano
-      ? `Gemini Nano on your computer ${failure(nano.verdict.problem)}, so Gemini in the cloud read it once more, as you allowed. `
+      ? `Gemini Nano on your computer ${failure(nano.verdict.problem)}, so Gemini in the cloud read it ${
+          nano.verdict.problem === NO_ANSWER ? 'instead' : 'once more'
+        }, as you allowed. `
       : '';
     if (onDeviceRun) {
       meta.textContent = `Gemini Nano ran in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`;
     } else if (nano || cloudOnly) {
-      meta.textContent =
-        'Gemini Nano’s answer did not pass Guardian’s check, so Gemini in the cloud read the request through Firebase, as you allowed. Your wallet address was not sent.';
+      meta.textContent = `${nanoNotUsed(nano ? nano.verdict.problem : nanoProblem)}, so Gemini in the cloud read the request through Firebase, as you allowed. Your wallet address was not sent.`;
     } else {
       meta.textContent =
         'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
@@ -503,7 +518,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
       );
       // Gemini Nano's answer was not used and the cloud is not allowed: offer
       // it, for this and the next requests.
-      if (onDeviceRun && !hybrid) offerFallback(result, host, { afterNano: true });
+      if (onDeviceRun && !hybrid) offerFallback(result, host, { afterNano: true, nanoProblem: verdict.problem });
     }
     meta.hidden = false;
     if (!onDeviceRun) showSent(prompt, true);

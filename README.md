@@ -39,9 +39,10 @@ Built for #BuildHybridAI 2026.
    matter most. No AI service is contacted. On a computer without Gemini
    Nano, a one-time permission lets Gemini in the cloud do it instead
    (Firebase AI Logic's hybrid fallback).
-4. **A deeper look, only if you ask.** One button sends the decoded facts
-   (never your own wallet address) to Gemini in the cloud for a structured
-   second opinion: the scam pattern it matches and what to verify, picked
+4. **A deeper look, only if you ask.** One button sends the decoded facts,
+   with the words of the button you pressed, the page title and the nearest
+   heading (never your own wallet address), to Gemini in the cloud for a
+   structured second opinion: the scam pattern it matches and what to verify, picked
    from fixed lists that code checks against the request.
 5. **You decide.** *Reject* returns the standard error 4001 to the site and
    the wallet never sees the request. *Continue* forwards exactly the request
@@ -59,18 +60,31 @@ Drainers rarely ask in so many words: the button says *Claim airdrop* or
 *Check eligibility*, and the request it sends gives someone the right to take
 your tokens. Guardian keeps the words of the button you pressed just before
 the request (a real click only; a click the page makes itself does not
-count), with the page's title and the nearest heading, and compares what they
-offer with what the request does (`src/analyzer/promise.js`).
+count, and any later click replaces it), with the page's title and the
+nearest heading above the button, and compares what they offer with what the
+request does (`src/analyzer/promise.js`). Addresses in these words, whole or
+shortened, are taken out before anything is cut short, shown or sent.
 
 - **Code reads plain words** — claim, reward, eligibility, sign in, verify,
   revoke, mint, swap, pay, stake, approve. The button shows among the facts
   (*Button pressed*). Only a clear contradiction is a warning: a button that
   offers to receive something, to sign in or to remove a permission, on a
-  request that takes assets out or grants a permission; or a mint, swap,
-  payment or stake that asks for every item in a collection. A button that
-  names more than one thing counts only if all of them contradict the request:
-  *Approve and claim* says it approves, so it is no warning. A contradiction
-  read by code makes the request *High risk*.
+  request that takes assets out or grants a permission (a sign-in or a revoke
+  also on coins sent to a contract call Guardian cannot read); or a mint,
+  swap, payment or stake that asks for every item in a collection. A button
+  that names more than one thing counts only if all of them contradict the
+  request: *Approve and claim* says it approves, so on a permission it is no
+  warning. Only verbs approve: *approve* and *authorize* anywhere; *unlock*,
+  *enable*, *allow*, *list*, *sell*, *grant* and *permit* only at the start
+  of the button or of a clause (*Claim and sell*). Nouns never do: *Connect
+  wallet to check approvals* offers a sign-in, *Revoke approval* offers to
+  revoke, and *Claim grant* offers to receive. Where code is not sure, it says
+  nothing and leaves the words to Gemini: *Unlock rewards* on a payment (it
+  may be paying to unlock something), or *Redeem*, *Collect* or *Enter to win*
+  on a token permission (redeeming shares or a paid entry can rightly need
+  one); *Collect* on a marketplace order for the user's own items stays a
+  warning, since no purchase needs one. A contradiction read by code makes
+  the request *High risk*.
 - **Gemini reads the words code cannot** — *Continue*, *Получить бонус*,
   *立即领取* — judging by the button's words, the page title and the heading,
   not by the request. Its reading is used only when its whole form passed the
@@ -102,7 +116,7 @@ never text for the user.
 | Answer | A JSON form (Prompt API `responseConstraint`) | The same form (`responseConstraint` on device, `responseJsonSchema` in the cloud) | A JSON form (`responseJsonSchema`) |
 | Model | Gemini Nano, built into Chrome | Gemini Nano if ready, else `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` |
 | When | By itself (the default) | By itself, after a one-time **Allow cloud AI as a fallback** | Only after the user presses **Ask cloud AI** |
-| Sent to an AI service | Nothing | Nothing when Nano's answer passes; otherwise the decoded facts | The decoded facts |
+| Sent to an AI service | Nothing | Nothing when Nano's answer passes; otherwise the decoded facts and the page's words (button, title, heading) | The decoded facts and the page's words |
 | Protected by | — (no network call) | Firebase App Check | Firebase App Check |
 
 **Who writes what.** Every word in Guardian's window is written by code.

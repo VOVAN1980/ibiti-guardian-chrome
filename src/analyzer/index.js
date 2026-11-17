@@ -19,7 +19,7 @@ import {
   wordToBigInt,
 } from './abi.js';
 import { PERMIT2, chainInfo, knownSpender, knownToken } from './registry.js';
-import { cleanPromise, contradiction, offersOf } from './promise.js';
+import { cleanPromise, readButton } from './promise.js';
 
 const SELECTOR = {
   approve: '0x095ea7b3',
@@ -69,17 +69,19 @@ export function analyze(req) {
  */
 function withPromise(result, promise) {
   if (!promise) return result;
-  const offers = offersOf(promise.button);
-  const clash = contradiction(offers, result, promise.button);
+  const { offers, offer, clash } = readButton(promise.button, result);
+  // After the action (or every numbered action or token of a batch).
   const facts = [...result.facts];
-  facts.splice(1, 0, fact('Button pressed', promise.button, clash ? { tone: 'danger' } : {}));
+  let at = 0;
+  while (at < facts.length && /^(?:Action|Token) \d+$/.test(facts[at].label)) at += 1;
+  facts.splice(Math.max(at, 1), 0, fact('Button pressed', promise.button, clash ? { tone: 'danger' } : {}));
   return {
     ...result,
     risk: clash ? 'danger' : result.risk,
     facts,
     reasons: clash ? [clash, ...result.reasons] : result.reasons,
     warnings: clash ? [clash, ...result.warnings] : result.warnings,
-    subject: { ...result.subject, promise: { ...promise, offer: offers[0] || null, offers, clash: Boolean(clash) } },
+    subject: { ...result.subject, promise: { ...promise, offer, offers, clash: Boolean(clash) } },
   };
 }
 
@@ -175,7 +177,13 @@ function analyzeTransaction(tx, ctx) {
       ...(value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : []),
     ],
     warnings: value > 0n ? [`It also sends ${formatUnits(value, 18)} ${chain.native} to the contract.`] : [],
-    subject: { action: 'contractCall', contract: to, selector, value: value.toString() },
+    subject: {
+      action: 'contractCall',
+      contract: to,
+      selector,
+      value: value.toString(),
+      ...(value > 0n ? { sends: `${formatUnits(value, 18)} ${chain.native}` } : {}),
+    },
   };
 }
 
