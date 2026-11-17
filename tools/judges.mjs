@@ -48,12 +48,13 @@ Try it (about 1 minute):
   5. Open https://ibiti-guardian-chrome.web.app/ (or press "Try it on the test page"
      in the panel). The page uses a demo wallet: no keys, no funds, nothing on chain.
   6. Press "Claim airdrop". Guardian's own window opens: the request is held,
-     the facts and the sentence on what confirming does are written by code,
-     and Gemini Nano reads the request on your device (Firebase AI Logic,
-     InferenceMode.ONLY_ON_DEVICE). Its reading comes back as a JSON form;
-     code compares it with the decoded request and only then adds the
-     reasons Gemini picked under "Most important", after Guardian's own
-     warnings. Every word in the window is written by code.
+     and it opens on what the button said against what the request really
+     does ("Does not match"). The facts and the sentence on what confirming
+     does are written by code, and Gemini Nano reads the request on your
+     device (Firebase AI Logic, InferenceMode.ONLY_ON_DEVICE). Its reading
+     comes back as a JSON form; code compares it with the decoded request and
+     only then adds the reasons Gemini picked (marked with a star), after
+     Guardian's own warnings. Every word in the window is written by code.
      No Gemini Nano in your Chrome? Press "Allow cloud AI as a fallback"
      once: from then on the reading uses InferenceMode.PREFER_ON_DEVICE and
      the SDK falls back to Gemini in the cloud by itself (chip "Cloud

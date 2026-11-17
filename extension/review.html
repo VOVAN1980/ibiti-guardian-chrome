@@ -15,42 +15,53 @@
     </header>
 
     <main>
+      <!-- The button the user pressed against what confirming really does.
+           Code writes both; words code cannot read may be read by Gemini,
+           marked ✦. -->
       <section class="hero">
         <p class="origin"><strong id="origin"></strong> wants your wallet to confirm</p>
+        <div class="promise" id="promise" aria-live="polite" hidden>
+          <div class="said">
+            <span class="label">The button said</span>
+            <q class="words" id="promise-button"></q>
+            <span class="context" id="promise-context" hidden></span>
+            <span class="reading" id="promise-reading"></span>
+          </div>
+          <p class="verdict" id="promise-verdict" hidden></p>
+          <span class="label">What it really does</span>
+        </div>
         <h1 id="headline">Checking the request…</h1>
+        <p class="ai-text" id="local-text"></p>
       </section>
 
-      <section class="ai" id="local" aria-live="polite">
+      <section class="ai" id="local" tabindex="-1" aria-live="polite">
         <div class="ai-head">
           <span class="ai-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /><path d="M9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></svg>
-            In plain words
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-2.9 8.3-7 10-4.1-1.7-7-5.4-7-10V6z" /></svg>
+            <span id="local-title">AI check</span>
           </span>
           <span class="chip" id="local-chip" hidden></span>
         </div>
-        <p class="ai-text" id="local-text"></p>
         <div class="important" id="local-important" hidden>
-          <p class="top-label">Most important:</p>
           <ul class="top" id="local-top"></ul>
           <p class="ai-meta" id="local-picked" hidden></p>
         </div>
         <p class="ai-note" id="local-note" hidden></p>
         <button class="quiet" id="local-download" type="button" hidden>Download the on-device model (one time)</button>
         <p class="ai-meta" id="local-meta" hidden></p>
+        <div class="fallback" id="local-fallback" hidden>
+          <button class="quiet" id="local-fallback-allow" type="button">Allow cloud AI as a fallback</button>
+          <p class="ai-meta consent" id="local-fallback-note">
+            Then Gemini in the cloud (Firebase) reads requests when this computer has no Gemini Nano, and once more
+            whenever Gemini Nano’s answer does not pass Guardian’s check. It gets the request’s details and the page’s
+            words near the button, which may include a name. Never your wallet address. Off any time in the toolbar
+            panel.
+          </p>
+        </div>
         <details class="sent" id="local-check-box" hidden>
           <summary>How Gemini’s answer was checked</summary>
           <p class="ai-meta" id="local-check"></p>
         </details>
-        <div class="fallback" id="local-fallback" hidden>
-          <button class="quiet" id="local-fallback-allow" type="button">Allow cloud AI as a fallback</button>
-          <p class="ai-meta" id="local-fallback-note">
-            Gemini in the cloud then reads the request through Firebase, now and next time: whenever this computer has
-            no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. Sends the
-            decoded details below, and the words of the button you pressed with the page’s title and nearest heading:
-            these are the site’s words and can hold personal details, such as a name. Never your wallet address. Turn
-            it off in Guardian’s toolbar panel.
-          </p>
-        </div>
         <details class="sent" id="local-sent-box" hidden>
           <summary id="local-sent-label">Exactly what would be sent</summary>
           <pre id="local-sent"></pre>
@@ -60,7 +71,7 @@
       <dl class="facts" id="facts"></dl>
 
       <section class="why" id="why" hidden>
-        <h2>Why this matters</h2>
+        <h2>Also worth knowing</h2>
         <ul id="reasons"></ul>
       </section>
 
@@ -69,7 +80,7 @@
         <pre id="message-text"></pre>
       </section>
 
-      <section class="ai cloud" id="cloud">
+      <section class="ai cloud" id="cloud" tabindex="-1">
         <div class="ai-head">
           <span class="ai-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96 6 6 0 0 1 11.47 1.5A3.75 3.75 0 0 1 17.5 18z" /></svg>
@@ -89,10 +100,9 @@
           </details>
         </div>
         <button class="quiet" id="cloud-ask" type="button">Ask cloud AI</button>
-        <p class="ai-meta" id="cloud-consent">
-          Optional. Sends the decoded details above (site, action, token, amount, the other party’s address), and
-          the words of the button you pressed with the page’s title and nearest heading (the site’s words, which can
-          hold personal details), to Gemini through Firebase. Your wallet address is not sent.
+        <p class="ai-meta consent" id="cloud-consent">
+          Optional: a scam pattern and what to check, from Gemini through Firebase. It gets the request’s details and
+          the page’s words near the button, which may include a name. Never your wallet address.
         </p>
         <details class="sent" id="cloud-sent-box">
           <summary>Exactly what would be sent</summary>
@@ -107,7 +117,7 @@
         <button id="allow" type="button">Continue anyway</button>
       </div>
       <p class="hold">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+        <span class="held" aria-hidden="true"></span>
         Held by Guardian. Your wallet has not seen this request.
       </p>
     </footer>

@@ -8,6 +8,7 @@
 // fallback) or asks for the deeper analysis.
 
 import { analyze } from './analyzer/index.js';
+import { OFFERS, contradiction } from './analyzer/promise.js';
 import {
   analyzeInCloud,
   cloudReady,
@@ -32,6 +33,8 @@ import {
 } from './host.js';
 
 const BADGE = { danger: 'High risk', caution: 'Check carefully', info: 'No red flags found' };
+// The title over the reasons listed first, by risk.
+const TOP_TITLE = { danger: 'Why it is high risk', caution: 'What to check', info: 'Good to know' };
 const $ = (id) => document.getElementById(id);
 const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
@@ -84,9 +87,13 @@ function render(record, result) {
   $('badge').textContent = BADGE[result.risk];
   $('origin').textContent = hostOf(record.origin);
   $('headline').textContent = result.headline;
+  showPromise(result);
 
+  // The button is shown above, with what it offered: not again here.
+  const above = Boolean((result.subject || {}).promise);
+  const facts = result.facts.filter((f) => !(above && f.label === 'Button pressed'));
   $('facts').replaceChildren(
-    ...result.facts.map((f) => {
+    ...facts.map((f) => {
       const row = document.createElement('div');
       row.className = 'fact';
       const dt = document.createElement('dt');
@@ -110,13 +117,16 @@ function render(record, result) {
     }),
   );
 
-  // The warnings at the top, the other reasons under "Why this matters".
+  // The warnings at the top, the other reasons under "Also worth knowing".
   showImportant(result, [], '');
 
   if (typeof result.message === 'string') {
     $('message-text').textContent = result.message.slice(0, 4000);
     $('message').hidden = false;
   }
+
+  // The window's motion starts now, with the request on screen.
+  document.body.dataset.shown = '';
 
   // The safer choice is the prominent one.
   const safeIsReject = result.risk !== 'info';
@@ -131,6 +141,14 @@ function render(record, result) {
 // with the user's permission, the SDK's hybrid mode falls back to the cloud
 // when this computer has no on-device model, and the cloud reads the request
 // once more when Gemini Nano's answer does not pass the check ──
+
+/** The AI status when no AI reads this request: a grey chip. */
+function noAi(text) {
+  const chip = $('local-chip');
+  chip.textContent = text;
+  chip.dataset.source = 'none';
+  chip.hidden = false;
+}
 
 function setChip(element, source, ms, label) {
   element.dataset.source = source;
@@ -190,10 +208,9 @@ function offerFallback(result, host, { afterNano = false, nanoProblem = '' } = {
   if (!cloudReady) return;
   if (isPreview) {
     $('local-fallback-note').textContent =
-      'For the rest of this visit, Gemini in the cloud then reads the request through Firebase whenever this browser ' +
-      'has no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. ' +
-      'Sends the decoded details below, and the words of the button you pressed with the page’s title and nearest ' +
-      'heading: the site’s words, which can hold personal details. Never your wallet address.';
+      'For the rest of this visit, Gemini in the cloud (Firebase) then reads requests when this browser has no ' +
+      'Gemini Nano, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. It gets the ' +
+      'request’s details and the page’s words near the button, which may include a name. Never your wallet address.';
   }
   showSent(cloudPrompt(result, host), false);
   $('local-fallback').hidden = false;
@@ -203,6 +220,7 @@ function offerFallback(result, host, { afterNano = false, nanoProblem = '' } = {
     allow.disabled = true;
     await allowCloudFallback();
     $('local-fallback').hidden = true;
+    $('local').focus();
     $('local-download').hidden = true;
     // Gemini Nano has already answered this one: only the cloud is asked now.
     await runLocal(result, host, { cloudOnly: afterNano, nanoProblem });
@@ -303,15 +321,86 @@ const failure = (problem) =>
       ? 'did not answer within 90 seconds'
       : `read the request differently from Guardian’s decoder (${differed(problem)})`;
 
+/** The warning code wrote for a button that contradicts the request, if any. */
+const clashOf = (result) => (((result.subject || {}).promise || {}).clash ? result.warnings[0] : null);
+
 /**
- * The reasons listed as most important: Guardian's warnings, always, then
- * the ones Gemini picked (the analyzer's own words, in Gemini's order).
+ * The button the user pressed against what confirming really does: the
+ * first thing on screen. Code reads plain words; for words it cannot read,
+ * `gemini` is Gemini's reading once its whole answer passed the check:
+ * { offer, warning, where }, or { pending: true } while it reads. Only code
+ * may say there is no mismatch, and only on a request with no red flags.
  */
-function showImportant(result, top, where, offerWarning = null) {
-  const items = mostImportant(result, top);
-  // Gemini's reading of an unclear button: after Guardian's warnings, in
-  // code's words that say it is Gemini's reading.
-  if (offerWarning) items.splice(items.filter((i) => i.by === 'guardian').length, 0, { n: 0, text: offerWarning, by: 'gemini' });
+function showPromise(result, gemini = null) {
+  const promise = (result.subject || {}).promise;
+  $('promise').hidden = !promise;
+  if (!promise) return;
+  $('promise-button').textContent = promise.button;
+  const label = (offer) => (OFFERS[offer] ? OFFERS[offer].label : null);
+  const pending = Boolean(!promise.offer && gemini && gemini.pending);
+  const read = !promise.offer && gemini && !gemini.pending ? gemini : null;
+  // A button that names more than one thing ("Approve and claim"): without a
+  // mismatch, the one that fits the request.
+  const own = promise.clash
+    ? promise.offer
+    : (promise.offers || []).find((o) => !contradiction(o, result, promise.button)) || promise.offer;
+  let line = 'Guardian cannot tell what these words offer';
+  if (promise.offer) line = `Guardian reads this as: ${label(own)}`;
+  else if (pending) line = 'Guardian’s code cannot read these words';
+  else if (read && label(read.offer)) line = `${read.where} reads this as: ${label(read.offer)}`;
+  else if (read) line = `${read.where} finds no clear offer in these words`;
+  const reading = $('promise-reading');
+  if (reading.textContent !== line) reading.textContent = line;
+  reading.dataset.by = promise.offer ? 'guardian' : read ? 'gemini' : '';
+  // Unclear words: the heading they sit under, which Gemini reads them with.
+  const context = $('promise-context');
+  context.textContent = !promise.offer && promise.heading ? `under “${promise.heading}”` : '';
+  context.hidden = !context.textContent;
+
+  const warning = promise.offer ? clashOf(result) : read ? read.warning : null;
+  const by = promise.offer ? 'guardian' : 'gemini';
+  const state = warning ? 'clash' : pending ? 'pending' : promise.offer && result.risk === 'info' ? 'none' : '';
+  const verdict = $('promise-verdict');
+  verdict.hidden = !state;
+  verdict.dataset.state = state || 'off';
+  verdict.dataset.by = by;
+  const text =
+    state === 'clash'
+      ? by === 'gemini'
+        ? 'Does not match · read by Gemini'
+        : 'Does not match'
+      : state === 'pending'
+        ? 'Gemini is reading…'
+        : 'No mismatch found';
+  // The whole warning, in code's words, for screen readers (and the record).
+  const whole =
+    state === 'clash'
+      ? warning
+      : state === 'pending'
+        ? 'Gemini is reading the button’s words.'
+        : 'No mismatch found between the button and the request.';
+  if (state && verdict.dataset.text !== whole) {
+    verdict.dataset.text = whole;
+    const shown = document.createElement('span');
+    shown.setAttribute('aria-hidden', 'true');
+    shown.textContent = text;
+    const said = document.createElement('span');
+    said.className = 'sr-only';
+    said.textContent = whole;
+    verdict.replaceChildren(shown, said);
+  }
+  document.body.dataset.promise = warning ? `clash:${by}` : state === 'none' ? 'none' : pending ? 'reading' : 'unread';
+}
+
+/**
+ * The reasons listed first: Guardian's warnings, always, then the ones
+ * Gemini picked (the analyzer's own words, in Gemini's order). A button that
+ * contradicts the request is shown above, once, not again here.
+ */
+function showImportant(result, top, where) {
+  const clash = clashOf(result);
+  const items = mostImportant(result, top).filter((i) => i.text !== clash);
+  $('local-title').textContent = items.length ? TOP_TITLE[result.risk] : 'AI check';
   $('local-top').replaceChildren(
     ...items.map((item) => {
       const li = document.createElement('li');
@@ -322,8 +411,9 @@ function showImportant(result, top, where, offerWarning = null) {
     }),
   );
   $('local-important').hidden = items.length === 0;
-  // The other reasons, once each: under "Why this matters".
+  // The other reasons, once each: under "Also worth knowing".
   const listed = new Set(items.map((i) => i.n).filter((n) => n > 0));
+  if (clash) listed.add(result.reasons.indexOf(clash) + 1);
   const rest = result.reasons.map((text, i) => [i + 1, text]).filter(([n]) => !listed.has(n));
   $('reasons').replaceChildren(
     ...rest.map(([n, text]) => {
@@ -337,7 +427,7 @@ function showImportant(result, top, where, offerWarning = null) {
   const picked = items.some((i) => i.by === 'gemini');
   const warned = items.some((i) => i.by === 'guardian');
   $('local-picked').textContent = picked
-    ? `${warned ? 'Warnings marked ⚠ are always shown by Guardian; the others were' : 'These were'} chosen by ${where}, and written by Guardian.`
+    ? `✦ chosen by ${where} from Guardian’s list${warned ? ' · ⚠ always shown by Guardian' : ''}`
     : '';
   $('local-picked').hidden = !picked;
   document.body.dataset.top = top.join(',');
@@ -386,6 +476,7 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
   // Nothing decoded: a model could only guess what the request does. Guardian
   // says so itself, and no AI is asked.
   if (isUndecoded(result)) {
+    noAi('No AI for this request');
     meta.textContent =
       'Guardian could not decode this request, so no AI reads it: an answer could only be a guess. Written by Guardian.';
     meta.hidden = false;
@@ -394,9 +485,10 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
   }
 
   if (!deviceReady && !hybrid) {
+    noAi(canDownload ? 'Gemini Nano · not downloaded' : 'No on-device AI');
     meta.textContent = canDownload
-      ? 'Written by Guardian. Gemini Nano can help pick the main reasons once its model is downloaded.'
-      : 'Written by Guardian. On-device AI is not available in this browser; the facts below do not depend on it.';
+      ? 'Gemini Nano can help once its model is downloaded. Everything here is Guardian’s own check.'
+      : 'Gemini Nano is not in this browser. Everything here is Guardian’s own check.';
     meta.hidden = false;
     if (canDownload) offerDownload(result, host);
     offerFallback(result, host);
@@ -404,6 +496,7 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
   }
 
   $('local-fallback').hidden = true;
+  showPromise(result, { pending: true });
   note.hidden = false;
   note.classList.add('pending');
   // While the AI reads, the window says how long it has taken so far: the
@@ -486,6 +579,9 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
           nano.verdict.problem === NO_ANSWER ? 'instead' : 'once more'
         }, as you allowed. `
       : '';
+    // (Not while the user's own deeper analysis went to the cloud meanwhile.)
+    const quiet = onDeviceRun && requests === 0 && deepAskedAt === Infinity;
+    if (quiet && !out.timedOut) $('local-chip').textContent += ' · nothing sent';
     if (onDeviceRun) {
       meta.textContent = `Gemini Nano ran in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`;
     } else if (nano || cloudOnly) {
@@ -498,7 +594,8 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
       note.hidden = true;
       note.textContent = '';
       const offerWarning = geminiOffer(result, verdict.offer);
-      showImportant(result, verdict.top, model, offerWarning);
+      showImportant(result, verdict.top, model);
+      showPromise(result, { offer: verdict.offer, warning: offerWarning, where: onDeviceRun ? 'Gemini Nano' : 'Gemini in the cloud' });
       document.body.dataset.offer = verdict.offer || '';
       if (offerWarning) document.body.dataset.offerWarning = '1';
       showCheck(
@@ -509,6 +606,7 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
     } else {
       note.classList.add('muted');
       note.textContent = 'Gemini’s answer was not used this time. Everything here is Guardian’s own.';
+      showPromise(result);
       showCheck(
         $('local-check-box'),
         $('local-check'),
@@ -520,7 +618,8 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
       // it, for this and the next requests.
       if (onDeviceRun && !hybrid) offerFallback(result, host, { afterNano: true, nanoProblem: verdict.problem });
     }
-    meta.hidden = false;
+    // On this computer with nothing sent, the chip says so: no line for it.
+    meta.hidden = quiet;
     if (!onDeviceRun) showSent(prompt, true);
     const nanoTook = (o) => (o.timedOut ? 'did not answer within 90 seconds' : `answered after ${seconds(o.ms)}`);
     $('local-chip').title = nano
@@ -552,6 +651,7 @@ async function runLocal(result, host, { cloudOnly = false, nanoProblem = '' } = 
     });
   } catch (error) {
     stopWaiting();
+    showPromise(result);
     if (run) run.catch(() => {}); // a late failure after the time-out
     note.classList.remove('pending');
     note.classList.add('muted');
@@ -670,6 +770,7 @@ function wireCloud(result, host) {
       $('cloud-result').hidden = false;
       setChip($('cloud-chip'), out.source, out.ms);
       ask.hidden = true;
+      $('cloud').focus(); // the button the user pressed is gone
       $('cloud-sent-box').querySelector('summary').textContent = 'Exactly what was sent';
       $('cloud-consent').textContent = 'Gemini through Firebase AI Logic, at your request.';
       document.body.dataset.cloud = 'done';
