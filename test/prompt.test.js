@@ -48,7 +48,7 @@ for (const [name, result] of Object.entries(cases)) {
 test('an approval keeps all its reasons in the cloud prompt', () => {
   const result = analyze(tx(USDT, `0x095ea7b3${pad(OTHER)}${uint((1n << 256n) - 1n)}`));
   const cloud = readingPrompt(result, 'shop.example', { cloud: true });
-  const why = cloud.split('Why it matters:\n')[1].split('\n');
+  const why = cloud.split('Why it matters:' + String.fromCharCode(10))[1].split(String.fromCharCode(10)).filter((l) => /^\d+\. /.test(l));
   assert.equal(why.length, result.reasons.length, 'every reason is there');
   assert.equal(cloud, readingPrompt(result, 'shop.example'), 'nothing about the balance to leave out');
 });

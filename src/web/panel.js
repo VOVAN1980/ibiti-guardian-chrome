@@ -52,6 +52,8 @@
       params: payload.params,
       chainId: typeof payload.chainId === 'number' ? payload.chainId : null,
       enrich: payload.enrich && typeof payload.enrich === 'object' ? payload.enrich : {},
+      // The button the user pressed just before; the analyzer checks it again.
+      promise: payload.promise && typeof payload.promise === 'object' ? payload.promise : null,
       createdAt: Date.now(),
     };
     try {

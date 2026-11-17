@@ -29,6 +29,7 @@
   const clearTimer = clearTimeout;
   const setRepeating = setInterval;
   const doc = document;
+  const ElementCtor = Element;
 
   // Where a guarded provider keeps its read-only call helper.
   const CALL = Symbol('ibitiGuardianCall');
@@ -105,6 +106,63 @@
         new CustomEventCtor(`${channel}:out`, { detail: stringify({ id, ...payload }) }),
       ]);
     });
+  }
+
+  // ── The page's promise: the button the user pressed just before ────────
+  // Only what the button said, the page title and the nearest heading: no
+  // form fields, no page text. A click the page makes itself (isTrusted
+  // false) does not count. Natives are taken now, before page scripts run.
+  const closest = Element.prototype.closest;
+  const querySel = Element.prototype.querySelector;
+  const docQuery = Document.prototype.querySelector;
+  const innerTextOf = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
+  const titleOf = Object.getOwnPropertyDescriptor(Document.prototype, 'title').get;
+  const parentOf = Object.getOwnPropertyDescriptor(Node.prototype, 'parentElement').get;
+  const now = Date.now;
+  const PRESSABLE = 'button, a, [role="button"], input[type="submit"], input[type="button"], summary';
+  const words = (value) =>
+    typeof value === 'string'
+      ? value
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 80)
+      : '';
+  let lastPress = null;
+
+  function pressed(event) {
+    try {
+      if (!event.isTrusted || !(event.target instanceof ElementCtor)) return;
+      const el = apply(closest, event.target, [PRESSABLE]);
+      if (!el) return;
+      const button =
+        words(apply(innerTextOf, el, [])) ||
+        words(el.value) ||
+        words(apply(getAttr, el, ['aria-label'])) ||
+        words(apply(getAttr, el, ['title']));
+      if (!button) return;
+      // The nearest heading: inside the closest ancestor that has one.
+      let heading = '';
+      for (let node = apply(parentOf, el, []), depth = 0; node && depth < 6 && !heading; node = apply(parentOf, node, []), depth++) {
+        const h = apply(querySel, node, ['h1, h2, h3']);
+        if (h) heading = words(apply(innerTextOf, h, []));
+      }
+      if (!heading) {
+        const h1 = apply(docQuery, doc, ['h1']);
+        if (h1) heading = words(apply(innerTextOf, h1, []));
+      }
+      lastPress = { button, title: words(apply(titleOf, doc, [])), heading, at: now() };
+    } catch {
+      // Whatever the page did to its own DOM, the review goes on without it.
+    }
+  }
+  apply(addListener, doc, ['click', pressed, true]);
+
+  /** The press, if it came just before this request (15 s). */
+  function promiseNow() {
+    if (!lastPress) return undefined;
+    const ageMs = now() - lastPress.at;
+    if (ageMs < 0 || ageMs > 15000) return undefined;
+    return { button: lastPress.button, title: lastPress.title, heading: lastPress.heading, ageMs };
   }
 
   // ── Read-only context, fetched through the user's own wallet ───────────
@@ -258,8 +316,10 @@
   }
 
   async function review(call, method, params) {
+    // The press that led to this request, taken before anything is awaited.
+    const promise = promiseNow();
     const context = await gatherContext(call, method, params);
-    return ask({ method, params: params === undefined ? [] : params, ...context });
+    return ask({ method, params: params === undefined ? [] : params, ...context, ...(promise ? { promise } : {}) });
   }
 
   // ── Wrapping providers ─────────────────────────────────────────────────
