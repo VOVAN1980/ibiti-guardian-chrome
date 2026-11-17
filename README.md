@@ -101,6 +101,13 @@ the form against the decoded request before using any of it.
   request with no red flags, never "no known pattern" on a high-risk request
   that has one — and adds the checks that must always be shown (marked ⚠).
 
+Measured on 2026-11-17 on the demo's requests: Gemini in the cloud read 27
+of 27 the way the decoder did (and 25 of 25 deeper analyses fit); Gemini Nano
+in Chrome read 6 of 9 (it took a collection approval for several actions,
+and a revoke and a sign-in for another site as something that takes assets).
+When a reading differs, nothing from it is used and Guardian's own text and
+warnings stand alone.
+
 What this does and does not prove: Gemini cannot put an amount, an address,
 a token, a role or a direction on screen that the decoder did not find, and
 it cannot hide a warning. It does not prove the rest of Guardian is free of

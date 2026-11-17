@@ -282,11 +282,15 @@ export const DEEP_SCHEMA = {
 
 // ── How to fill the forms in: part of the prompts ───────────────────────────
 
+// Rules for every request, not answers for this one. Measured on Gemini Nano
+// in Chrome (2026-11-17, demo requests): with one-line definitions it read 4
+// of 9 right, with these 6 of 9 (giving it the code's sentence did not help).
+// The cloud model read 27 of 27 right. A wrong reading is never used.
 export const READING_GUIDE = [
-  `- action: what kind of request this is: ${ACTIONS.join(', ')}.`,
-  '- who_gains: who could move or receive the user\'s assets if the user confirms: another_party, you (the user), or nobody.',
-  '- direction: which way the user\'s own assets can move as a result: out_of_your_wallet, into_your_wallet, or nothing_moves.',
-  '- limit: for a spending permission, unlimited or limited (unlimited if any token in it is unlimited); for a payment, limited; for access to a whole collection, unlimited; for several actions, unlimited if any of them is, otherwise limited; otherwise does_not_apply.',
+  `- action: what kind of request this is: ${ACTIONS.join(', ')}. A transfer or "Send" is a payment; an approval or permit is a spending_permission; "Approval for all" (every item in a collection) is collection_access; "Revoke" is remove_permission; several_actions only for a list of actions.`,
+  '- who_gains: another_party if someone other than the user could take, move or receive the user\'s assets, or use the signature as the user; you only if assets would come to the user; nobody if no assets can move (signing in, signing text, removing a permission).',
+  '- direction: out_of_your_wallet if the user\'s assets can leave, now or later through a permission; into_your_wallet only if assets would come to the user; nothing_moves when signing in, signing text or removing a permission.',
+  '- limit: unlimited if the facts say Unlimited, all items, or any amount (for several tokens or actions: if any of them is); limited if there is a fixed amount, as in a payment; does_not_apply when signing in, signing text or removing a permission.',
 ].join('\n');
 export const REASONS_GUIDE =
   '- reasons: the numbers of the one or two most important lines under "Why it matters", most important first.';
