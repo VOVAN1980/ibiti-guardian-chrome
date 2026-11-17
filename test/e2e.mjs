@@ -807,6 +807,13 @@ await step('the button the user pressed is compared with what the request does',
     assert.equal(out.button, 'Approve 25 USDC for a swap');
     assert.equal(out.badge, 'No red flags found');
     assert.ok(!out.important.some((i) => /button you pressed/.test(i)));
+    // The nearest heading above the button, not the first one on the page.
+    const sent = await swap.review.evaluate(() => document.getElementById('cloud-sent').textContent);
+    // (The page shows its section headings in capitals; Guardian keeps what is shown.)
+    const pageLine = sent.split('\n').find((l) => l.startsWith('The page:')) || sent;
+    if (await swap.review.evaluate(() => document.body.dataset.cloud !== 'off')) {
+      assert.match(pageLine, /heading near the button "Ordinary requests · Guardian should stay calm"/i, pageLine);
+    }
   } finally {
     await rejectAndWait(swap.review);
   }
@@ -823,6 +830,22 @@ await step('the button the user pressed is compared with what the request does',
     assert.notEqual(out.button, 'Unlock NFT trading', 'the page’s own click is not taken as the user’s');
   } finally {
     await rejectAndWait(faked);
+  }
+  // A real click on something else replaces an earlier press.
+  await page.bringToFront();
+  await page.click('[data-scenario="limited"]');
+  const first = await browser.waitForTarget((t) => t.url().includes('/review.html') && !before.has(t));
+  await rejectAndWait(await first.asPage());
+  await page.bringToFront();
+  await page.click('h1');
+  const before2 = new Set(browser.targets());
+  await page.evaluate(() => document.querySelector('[data-scenario="nft"]').click());
+  const later = await (await browser.waitForTarget((t) => !before2.has(t) && t.url().includes('/review.html'))).asPage();
+  try {
+    await later.waitForFunction(() => document.body.dataset.local !== undefined);
+    assert.equal((await promiseView(later)).button, null, 'the swap button is not shown for a later request');
+  } finally {
+    await rejectAndWait(later);
   }
 });
 
