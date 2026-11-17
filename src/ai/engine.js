@@ -67,9 +67,9 @@ export async function downloadDeviceModel(onProgress) {
 // Nano, the cloud model as its response schema.
 // The prompt already says what each field means: Chrome need not add the
 // schema to it as well (measured on Gemini Nano: it read more requests right).
-const deviceParams = () => ({
+const deviceParams = (signal) => ({
   ...ON_DEVICE_PARAMS,
-  promptOptions: { responseConstraint: READING_SCHEMA, omitResponseConstraintInput: true },
+  promptOptions: { responseConstraint: READING_SCHEMA, omitResponseConstraintInput: true, ...(signal ? { signal } : {}) },
 });
 const cloudParams = (schema) => ({
   model: CLOUD_MODEL,
@@ -92,10 +92,10 @@ async function answer(model, prompt, signal) {
  * The short explanation from Gemini Nano on this computer.
  * @returns {{text: string, ms: number, source: string}}  text: the form, as JSON
  */
-export async function readOnDevice(prompt) {
+export async function readOnDevice(prompt, { deviceSignal } = {}) {
   const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
-    onDeviceParams: deviceParams(),
+    onDeviceParams: deviceParams(deviceSignal),
   });
   return answer(model, prompt);
 }
@@ -118,12 +118,13 @@ export async function readOnDevice(prompt) {
  *
  * `signal` stops a cloud request that has not gone out yet (the user turned
  * the permission off): the SDK checks it right before sending.
+ * `deviceSignal` stops Gemini Nano's answer (the window's time-out).
  * @returns {{text: string, ms: number, source: string}}
  */
-export async function readHybrid(prompt, { deviceReady = false, signal } = {}) {
+export async function readHybrid(prompt, { deviceReady = false, signal, deviceSignal } = {}) {
   const model = getGenerativeModel(deviceReady ? onDevice() : inCloud(), {
     mode: InferenceMode.PREFER_ON_DEVICE,
-    onDeviceParams: deviceParams(),
+    onDeviceParams: deviceParams(deviceSignal),
     inCloudParams: cloudParams(READING_SCHEMA),
   });
   return answer(model, prompt, signal);

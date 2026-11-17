@@ -884,6 +884,43 @@ await step('an unclear button: Gemini reads it, and its reading can only add a w
   await page.evaluate(() => document.getElementById('eligibility').remove());
 });
 
+// Gemini Nano that never answers (seen once on a page in another language):
+// after 90 s its answer counts as not given; the window says so and the
+// decision keeps working the whole time.
+await step('Gemini Nano that never answers: after 90 s the window moves on', async () => {
+  const first = await reviewWithCalls('claim');
+  let tab = null;
+  try {
+    await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
+    tab = await browser.newPage();
+    await tab.evaluateOnNewDocument(() => {
+      self.LanguageModel = {
+        availability: async () => 'available',
+        create: async () => ({ prompt: () => new Promise(() => {}), destroy: () => {} }),
+      };
+    });
+    tab.goto(first.review.url()).catch(() => {});
+    await tab.waitForFunction(() => document.body.dataset.local !== undefined, { polling: 200 });
+    assert.equal(await tab.evaluate(() => !document.getElementById('reject').disabled), true, 'the decision works while it waits');
+    await tab.waitForFunction(() => document.body.dataset.local === 'done', { timeout: 120000, polling: 500 });
+    const out = await tab.evaluate(() => ({
+      checked: document.body.dataset.checked,
+      withheld: document.body.dataset.withheld,
+      note: document.getElementById('local-note').textContent,
+      check: document.getElementById('local-check').textContent,
+      offer: !document.getElementById('local-fallback').hidden,
+    }));
+    assert.equal(out.checked, 'withheld');
+    assert.equal(out.withheld, 'no answer within 90 seconds');
+    assert.match(out.note, /Gemini’s answer was not used this time/);
+    assert.match(out.check, /Gemini Nano on your computer did not answer within 90 seconds/);
+    assert.equal(out.offer, true, 'the cloud is offered, as after any answer that did not pass');
+  } finally {
+    if (tab) await tab.close().catch(() => {});
+    await rejectAndWait(first.review);
+  }
+});
+
 // However the AI service fails, the facts are there at once and Reject and
 // Continue keep working: the AI is never in the way of the decision.
 let expectedWallet = 1;

@@ -303,8 +303,14 @@ export const READING_GUIDE = [
 ].join('\n');
 export const REASONS_GUIDE =
   '- reasons: the numbers of the one or two most important lines under "Why it matters", most important first.';
+// Measured on Gemini Nano (2026-11-17): asked as part of the form, it read
+// the request instead of the button ("approve" for "Continue"); told to judge
+// the button's words only, placed after the facts, it read 6 of 8 unclear
+// test buttons exactly (English, Russian, Chinese), and on all 8 the warning
+// came out as it should ("Check eligibility" read as a sign-in, "Join
+// waitlist" as a mint: the same outcome); no false warning.
 export const OFFER_GUIDE =
-  '- offer: what the button the user pressed offered, judging by its words, the page title and the heading: receive (a claim, reward, airdrop, bonus), sign_in (sign in, connect, verify), revoke, mint, swap, pay, stake, approve (approve, list, unlock); other if none of these; no_button if no button is given.';
+  "- offer: what the button the user pressed promised, judged only by the button's own words, the page title and the heading, not by the request decoded above (a page may say one thing and ask for another): receive (claim, reward, airdrop, bonus, get), sign_in (sign in, connect, verify, activate), revoke, mint, swap, pay, stake (stake, earn, farm), approve (approve, list, unlock); other when the words do not say what happens (Continue, Next, OK, Join); no_button if no button is given.";
 export const PATTERN_GUIDE = `- pattern: a known wallet-scam pattern this request has the shape of (${Object.keys(PATTERNS)
   .filter(KNOWN)
   .join(', ')}); no_known_pattern if it matches none (that does not make it safe); cannot_determine if the facts are not enough to tell.`;

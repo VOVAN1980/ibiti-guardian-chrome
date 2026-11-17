@@ -192,10 +192,12 @@ export function readingPrompt(result, host, { cloud = false } = {}) {
     'Read the facts and answer in JSON with these fields:',
     READING_GUIDE,
     hasReasons ? REASONS_GUIDE : '- reasons: an empty list.',
-    OFFER_GUIDE,
     SITE_WORDS_RULE,
     '',
     ...requestLines(result, cloud),
+    // Last, after the facts: small models otherwise answer it from the request.
+    '',
+    OFFER_GUIDE,
   ]
     .filter((text) => text !== null)
     .join('\n');
