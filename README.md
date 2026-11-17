@@ -1,9 +1,10 @@
 # IBITI Guardian for Chrome
 
 **Know what you sign.** Wallet drainers rarely hack anything: they ask you to
-sign. Guardian holds a wallet request *before your wallet sees it*, decodes it
-into plain facts, lets Gemini explain it — on your device first, in the cloud
-only if you allow it — and then you decide.
+sign. Guardian holds a wallet request *before your wallet sees it*, shows what
+the button you pressed said against what the request really does, decodes it
+into plain facts, and lets Gemini read it too — on your device first, in the
+cloud only if you allow it — and then you decide.
 
 **Try it now, nothing to install: https://ibiti-guardian-chrome.web.app**
 (a simulation with a demo wallet that has no keys and no funds; the extension
@@ -168,7 +169,8 @@ reads the request once more, and its answer is checked the same way.
 
 While Gemini reads, the window counts the seconds and says the user can
 decide without it: the facts, the warnings and both buttons are there from
-the start. Gemini Nano usually answers in 15–30 seconds. Under a schema that
+the start. Gemini Nano answered in 22–33 seconds on our test PC (it runs on
+the CPU there). Under a schema that
 allowed any whole number, it once wrote `"reasons": [1, 2301000000…` and
 never stopped; the form for Gemini Nano now lists the numbers it may pick
 (`DEVICE_READING_SCHEMA`), and the same request then took 29–33 seconds,
@@ -193,9 +195,9 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
   permission, and **Exactly what was sent** after every cloud answer. It
   never holds the user's wallet address or balance; for a payment measured
   against the balance, the risk level stays on the computer too.
-- Each answer shows where it ran and how long it took (*On device · 3.0 s*,
-  *Cloud fallback · 1.6 s*, *Cloud · 2.3 s*), from the SDK's
-  `inferenceSource`.
+- Each answer shows where it ran and how long it took (*On device · 21.9 s ·
+  nothing sent*, *Cloud fallback · 2.0 s*, *Cloud · 12.6 s*), from the SDK's
+  `inferenceSource`; without AI, the chip says so (*No on-device AI*).
 - The SDK falls back when no on-device model is ready (including one that
   still needs downloading; the window then also offers the download). If
   Gemini Nano is there but fails while answering, Guardian's own text stands
