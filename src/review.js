@@ -443,7 +443,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
         if (!error || error.name !== 'TimeoutError') throw error;
         run.catch(() => {});
         // No answer in time: the same as an answer that did not pass.
-        out = { text: '', ms: DEVICE_TIMEOUT_MS, source: 'on_device' };
+        out = { text: '', ms: DEVICE_TIMEOUT_MS, source: 'on_device', timedOut: true };
         verdict = { checked: 'withheld', words: '', top: [], offer: null, problem: 'no answer within 90 seconds', detail: '' };
       }
     }
@@ -460,6 +460,10 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     stopWaiting();
     note.classList.remove('pending');
     setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
+    if (out.timedOut) {
+      $('local-chip').textContent = 'On device · no answer in 90 s';
+      $('local-chip').dataset.source = 'none';
+    }
     const requests = cloudRequestsBetween(started, performance.now());
     const onDeviceRun = out.source === 'on_device';
     const model = onDeviceRun ? 'Gemini Nano on your computer' : 'Gemini in the cloud';
@@ -503,9 +507,10 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     }
     meta.hidden = false;
     if (!onDeviceRun) showSent(prompt, true);
+    const nanoTook = (o) => (o.timedOut ? 'did not answer within 90 seconds' : `answered after ${seconds(o.ms)}`);
     $('local-chip').title = nano
-      ? `Gemini Nano answered after ${seconds(nano.out.ms)}; Gemini in the cloud after ${seconds(out.ms)} more. Network requests from this window meanwhile: ${requests}.`
-      : `Answered after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
+      ? `Gemini Nano ${nanoTook(nano.out)}; Gemini in the cloud answered after ${seconds(out.ms)} more. Network requests from this window meanwhile: ${requests}.`
+      : `${out.timedOut ? 'No answer within 90 seconds' : `Answered after ${seconds(out.ms)}`}. Network requests from this window meanwhile: ${requests}.`;
     Object.assign(document.body.dataset, {
       local: 'done',
       source: out.source,
@@ -522,7 +527,14 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
       document.body.dataset.withheld = verdict.problem;
       document.body.dataset.withheldDetail = verdict.detail || ''; // tests and logs only
     }
-    saveLastExplanation({ source: out.source, ms: out.ms, requests, checked: verdict.checked, retried: Boolean(nano) });
+    saveLastExplanation({
+      source: out.source,
+      ms: out.ms,
+      requests,
+      checked: verdict.checked,
+      retried: Boolean(nano),
+      timedOut: Boolean(out.timedOut),
+    });
   } catch (error) {
     stopWaiting();
     if (run) run.catch(() => {}); // a late failure after the time-out

@@ -51,9 +51,15 @@ if (last && typeof last.at === 'number') {
     : [
         when,
         where,
-        typeof last.ms === 'number' ? s(last.ms) : null,
+        last.timedOut ? 'no answer in 90 s' : typeof last.ms === 'number' ? s(last.ms) : null,
         `${requests} network request${requests === 1 ? '' : 's'}`,
-        last.checked === 'withheld' ? 'answer not used' : last.checked === 'passed' ? 'reading matched the decoder' : null,
+        last.timedOut
+          ? null
+          : last.checked === 'withheld'
+            ? 'answer not used'
+            : last.checked === 'passed'
+              ? 'reading matched the decoder'
+              : null,
       ];
   show('last', parts.filter(Boolean).join(' · '), !last.error && last.source === 'on_device' && last.requests === 0 ? 'ok' : 'off');
   $('last-row').hidden = false;

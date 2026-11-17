@@ -943,9 +943,15 @@ await step('Gemini Nano that never answers: after 90 s the window moves on', asy
       note: document.getElementById('local-note').textContent,
       check: document.getElementById('local-check').textContent,
       offer: !document.getElementById('local-fallback').hidden,
+      chip: document.getElementById('local-chip').textContent,
+      chipTitle: document.getElementById('local-chip').title,
+      chipLook: document.getElementById('local-chip').dataset.source,
     }));
     assert.equal(out.checked, 'withheld');
     assert.equal(out.withheld, 'no answer within 90 seconds');
+    assert.equal(out.chip, 'On device · no answer in 90 s', 'the chip does not look like an answer');
+    assert.equal(out.chipLook, 'none', 'nor is it coloured like one');
+    assert.match(out.chipTitle, /^No answer within 90 seconds\./);
     assert.match(out.note, /Gemini’s answer was not used this time/);
     assert.match(out.check, /Gemini Nano on your computer did not answer within 90 seconds/);
     assert.equal(out.offer, true, 'the cloud is offered, as after any answer that did not pass');
