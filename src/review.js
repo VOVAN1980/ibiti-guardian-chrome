@@ -211,6 +211,10 @@ function offerFallback(result, host, { afterNano = false } = {}) {
 // A cloud call that never starts (on the hosted demo, reCAPTCHA blocked by a
 // privacy tool or a network filter) must not leave the window waiting.
 const CLOUD_TIMEOUT_MS = 45000;
+// Gemini Nano usually answers in 15 to 30 s (the first time after a pause,
+// up to about a minute); it has also been seen to hang on a page in another
+// language. After this long its answer counts as not given.
+const DEVICE_TIMEOUT_MS = 90000;
 
 /**
  * Waits for `promise` at most `ms`. On time-out it also calls `onTimeout`,
@@ -266,6 +270,13 @@ function cloudProblem(error) {
 // all-clear. Whether its reading matched the decoder is in the details.
 const WRITTEN_BY_GUARDIAN = 'Every word here is written by Guardian: Gemini answers a form, never text that is shown.';
 const differed = (problem) => problem.replace(/^a different reading of the request \((.*)\)$/, '$1');
+/** What went wrong with a model's answer, after its name: "gave no usable answer", … */
+const failure = (problem) =>
+  problem === 'no usable answer'
+    ? 'gave no usable answer'
+    : problem === 'no answer within 90 seconds'
+      ? 'did not answer within 90 seconds'
+      : `read the request differently from Guardian’s decoder (${differed(problem)})`;
 
 /**
  * The reasons listed as most important: Guardian's warnings, always, then
@@ -387,6 +398,8 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
   // Turning the permission off stops a cloud request that has not gone out,
   // on either path of the hybrid mode; so does the time-out.
   const stop = new AbortController();
+  // Gemini Nano's own stop: its time-out must not stop the cloud's answer after it.
+  const deviceStop = new AbortController();
   const stopListening = hybrid ? onCloudFallbackOff(() => stop.abort(new Error('cloud turned off'))) : () => {};
   let run = null;
   // Gemini Nano's answer, when its reading did not match and the cloud was
@@ -396,10 +409,25 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     run = cloudOnly
       ? readInCloud(prompt, { signal: stop.signal })
       : hybrid
-        ? readHybrid(prompt, { deviceReady, signal: stop.signal })
-        : readOnDevice(prompt);
-    let out = toCloud ? await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e)) : await run;
-    let verdict = checkExplanation(out.text, result, { shown });
+        ? readHybrid(prompt, { deviceReady, signal: stop.signal, deviceSignal: deviceStop.signal })
+        : readOnDevice(prompt, { deviceSignal: deviceStop.signal });
+    let out;
+    let verdict;
+    if (toCloud) {
+      out = await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
+      verdict = checkExplanation(out.text, result, { shown });
+    } else {
+      try {
+        out = await withTimeout(run, DEVICE_TIMEOUT_MS, (e) => deviceStop.abort(e));
+        verdict = checkExplanation(out.text, result, { shown });
+      } catch (error) {
+        if (!error || error.name !== 'TimeoutError') throw error;
+        run.catch(() => {});
+        // No answer in time: the same as an answer that did not pass.
+        out = { text: '', ms: DEVICE_TIMEOUT_MS, source: 'on_device' };
+        verdict = { checked: 'withheld', words: '', top: [], offer: null, problem: 'no answer within 90 seconds', detail: '' };
+      }
+    }
     // Gemini Nano's reading did not match the decoder. With the user's
     // permission, Gemini in the cloud reads the request once more.
     if (verdict.checked !== 'passed' && out.source === 'on_device' && hybrid) {
@@ -415,11 +443,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
     const onDeviceRun = out.source === 'on_device';
     const model = onDeviceRun ? 'Gemini Nano on your computer' : 'Gemini in the cloud';
     const nanoFirst = nano
-      ? `Gemini Nano on your computer ${
-          nano.verdict.problem === 'no usable answer'
-            ? 'gave no usable answer'
-            : `read the request differently from Guardian’s decoder (${differed(nano.verdict.problem)})`
-        }, so Gemini in the cloud read it once more, as you allowed. `
+      ? `Gemini Nano on your computer ${failure(nano.verdict.problem)}, so Gemini in the cloud read it once more, as you allowed. `
       : '';
     if (onDeviceRun) {
       meta.textContent = `Gemini Nano ran in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`;
@@ -449,9 +473,7 @@ async function runLocal(result, host, { cloudOnly = false } = {}) {
         $('local-check-box'),
         $('local-check'),
         `${nanoFirst}${
-          verdict.problem === 'no usable answer'
-            ? `${model} gave no usable answer, so none of it was used.`
-            : `${model} read the request differently from Guardian’s decoder (${differed(verdict.problem)}), so none of its answer was used.`
+          `${model} ${failure(verdict.problem)}, so none of its answer was used.`
         } ${WRITTEN_BY_GUARDIAN}`,
       );
       // Gemini Nano's answer was not used and the cloud is not allowed: offer
