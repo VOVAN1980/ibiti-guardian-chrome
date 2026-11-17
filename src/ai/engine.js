@@ -65,9 +65,11 @@ export async function downloadDeviceModel(onProgress) {
 // Gemini answers a form (src/ai/reading.js), the same JSON Schema on both
 // paths: Chrome's Prompt API takes it as a response constraint for Gemini
 // Nano, the cloud model as its response schema.
+// The prompt already says what each field means: Chrome need not add the
+// schema to it as well (measured on Gemini Nano: it read more requests right).
 const deviceParams = () => ({
   ...ON_DEVICE_PARAMS,
-  promptOptions: { responseConstraint: READING_SCHEMA },
+  promptOptions: { responseConstraint: READING_SCHEMA, omitResponseConstraintInput: true },
 });
 const cloudParams = (schema) => ({
   model: CLOUD_MODEL,
