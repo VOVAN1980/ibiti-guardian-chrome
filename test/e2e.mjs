@@ -826,52 +826,82 @@ await step('the button the user pressed is compared with what the request does',
   }
 });
 
-await step('an unclear button: Gemini reads it, and its reading can only add a warning', async () => {
-  // A button whose words code does not read, sending an unlimited approval.
-  await page.bringToFront();
-  await page.evaluate(() => {
-    const button = document.createElement('button');
-    button.id = 'eligibility';
-    button.textContent = 'Check eligibility';
-    button.onclick = async () => {
-      const [from] = await window.ethereum.request({ method: 'eth_accounts' });
-      const spender = '9f3a00000000000000000000000000000000c21e'.padStart(64, '0');
-      await window.ethereum
-        .request({
-          method: 'eth_sendTransaction',
-          params: [{ from, to: '0xdAC17F958D2ee523a2206206994597C13D831ec7', data: `0x095ea7b3${spender}${'f'.repeat(64)}` }],
-        })
-        .then(
-          (result) => window.__dapp.history.push({ ok: true, result }),
-          (error) => window.__dapp.history.push({ ok: false, code: error.code }),
-        );
-    };
-    document.body.prepend(button);
-  });
-  for (const offer of ['receive', 'other']) {
+await step('the button you write yourself: plain words read by code, a sign-in stays calm, "Approve and claim" is no contradiction', async () => {
+  // Opens the card's button with these words and this request.
+  const pressOwn = async (words, kind) => {
+    await page.bringToFront();
+    await page.evaluate((w) => {
+      const input = document.getElementById('own-label');
+      input.value = w;
+      input.dispatchEvent(new Event('input'));
+    }, words);
+    await page.select('#own-kind', kind);
     const before = new Set(browser.targets());
-    await page.click('#eligibility');
+    await page.click('#own-press');
+    const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
+    const review = await target.asPage();
+    await review.waitForFunction(() => document.body.dataset.local !== undefined, { polling: 200 });
+    return review;
+  };
+  const cases = [
+    ['Check eligibility', 'ownPermission', 'High risk', /^guardian: The button you pressed said “Check eligibility”, an offer to receive something, but this request gives someone permission to take any amount of USDT/],
+    ['Check eligibility', 'ownSignin', 'No red flags found', null],
+    ['Approve and claim', 'ownPermission', 'High risk', null],
+    ['Stake', 'ownPermission', 'High risk', null],
+  ];
+  for (const [words, kind, badge, warning] of cases) {
+    const review = await pressOwn(words, kind);
+    try {
+      const out = await promiseView(review);
+      assert.equal(out.button, words, words);
+      assert.equal(out.badge, badge, `${words} / ${kind}`);
+      const about = out.important.filter((i) => /button you pressed/.test(i));
+      if (warning) assert.match(about[0] || '', warning, words);
+      else assert.deepEqual(about, [], `${words} / ${kind}: no warning about the button`);
+    } finally {
+      await rejectAndWait(review);
+    }
+  }
+  await page.evaluate(() => {
+    const input = document.getElementById('own-label');
+    input.value = 'Check eligibility';
+    input.dispatchEvent(new Event('input'));
+  });
+  await page.select('#own-kind', 'ownPermission');
+});
+
+await step('words code cannot read: Gemini reads them, and its reading can only add a warning', async () => {
+  for (const offer of ['receive', 'other']) {
+    await page.bringToFront();
+    await page.evaluate(() => {
+      const input = document.getElementById('own-label');
+      input.value = 'Continue';
+      input.dispatchEvent(new Event('input'));
+    });
+    await page.select('#own-kind', 'ownPermission');
+    const before = new Set(browser.targets());
+    await page.click('#own-press');
     const target = await browser.waitForTarget((t) => !before.has(t) && t.url().includes('/review.html'));
     const first = await target.asPage();
     let tab = null;
     try {
-      await first.waitForFunction(() => document.body.dataset.local !== undefined);
+      await first.waitForFunction(() => document.body.dataset.local !== undefined, { polling: 200 });
       const plain = await promiseView(first);
-      assert.equal(plain.button, 'Check eligibility');
-      assert.ok(!plain.important.some((i) => /button you pressed/.test(i)), 'code does not read these words');
+      assert.equal(plain.button, 'Continue');
+      assert.ok(!plain.important.some((i) => /button you pressed/.test(i)), 'code does not read “Continue”');
       tab = await browser.newPage();
       await tab.evaluateOnNewDocument(fakeNano, JSON.stringify({ ...RIGHT, offer }));
       tab.goto(first.url()).catch(() => {});
       await tab.waitForFunction(() => document.body.dataset.local === 'done', { timeout: 20000, polling: 200 });
       const out = await promiseView(tab);
       const nanoPrompt = await tab.evaluate(() => window.__nano[0]);
-      assert.match(nanoPrompt, /Button pressed: \\"Check eligibility\\"/, 'Gemini was given the button’s words, as the site’s');
+      assert.match(nanoPrompt, /Button pressed: \\"Continue\\"/, 'Gemini was given the button’s words, as the site’s');
+      assert.match(nanoPrompt, /heading near the button \\"Season 2 rewards\\"/, 'and the heading near it');
       if (offer === 'receive') {
         assert.ok(
-          out.important.includes('gemini: Gemini reads the button you pressed, “Check eligibility”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet.'),
+          out.important.includes('gemini: Gemini reads the button you pressed, “Continue”, as an offer to receive something, but this request gives someone permission to take any amount of USDT out of your wallet.'),
           out.important.join(' | '),
         );
-        assert.equal(await tab.evaluate(() => document.body.dataset.offerWarning), '1');
       } else {
         assert.ok(!out.important.some((i) => /button you pressed/.test(i)));
       }
@@ -881,7 +911,11 @@ await step('an unclear button: Gemini reads it, and its reading can only add a w
       await rejectAndWait(first);
     }
   }
-  await page.evaluate(() => document.getElementById('eligibility').remove());
+  await page.evaluate(() => {
+    const input = document.getElementById('own-label');
+    input.value = 'Check eligibility';
+    input.dispatchEvent(new Event('input'));
+  });
 });
 
 // Gemini Nano that never answers (seen once on a page in another language):

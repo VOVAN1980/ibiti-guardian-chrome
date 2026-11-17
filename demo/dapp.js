@@ -247,6 +247,22 @@ async function run(scenario) {
   }
 }
 
+// The button the visitor writes: its words, and what it really asks for.
+SCENARIOS.ownPermission = SCENARIOS.claim;
+SCENARIOS.ownSignin = SCENARIOS.signin;
+const ownLabel = document.getElementById('own-label');
+const ownKind = document.getElementById('own-kind');
+const ownPress = document.getElementById('own-press');
+const syncOwn = () => {
+  ownPress.textContent = ownLabel.value.trim() || 'Continue';
+  ownPress.dataset.scenario = ownKind.value;
+};
+if (ownLabel && ownKind && ownPress) {
+  ownLabel.addEventListener('input', syncOwn);
+  ownKind.addEventListener('change', syncOwn);
+  syncOwn();
+}
+
 for (const button of document.querySelectorAll('[data-scenario]')) {
   button.addEventListener('click', () => run(button.dataset.scenario));
 }

@@ -45,7 +45,9 @@
           <p class="ai-meta" id="local-fallback-note">
             Gemini in the cloud then reads the request through Firebase, now and next time: whenever this computer has
             no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. Sends the
-            decoded details below, never your wallet address. Turn it off in Guardian’s toolbar panel.
+            decoded details below, and the words of the button you pressed with the page’s title and nearest heading:
+            these are the site’s words and can hold personal details, such as a name. Never your wallet address. Turn
+            it off in Guardian’s toolbar panel.
           </p>
         </div>
         <details class="sent" id="local-sent-box" hidden>
@@ -87,8 +89,9 @@
         </div>
         <button class="quiet" id="cloud-ask" type="button">Ask cloud AI</button>
         <p class="ai-meta" id="cloud-consent">
-          Optional. Sends the decoded details above (site, action, token, amount, the other party’s address) to
-          Gemini through Firebase. Your wallet address is not sent.
+          Optional. Sends the decoded details above (site, action, token, amount, the other party’s address), and
+          the words of the button you pressed with the page’s title and nearest heading (the site’s words, which can
+          hold personal details), to Gemini through Firebase. Your wallet address is not sent.
         </p>
         <details class="sent" id="cloud-sent-box">
           <summary>Exactly what would be sent</summary>

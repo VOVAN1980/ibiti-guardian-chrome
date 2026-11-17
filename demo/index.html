@@ -60,6 +60,12 @@
       .line.unguarded { color: var(--danger); }
       .line.passed, .line.wallet { color: var(--text-2); }
 
+      .own h3 { font-size: 22px; margin: 12px 0 14px; letter-spacing: -0.01em; }
+      .own-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 16px; }
+      .own-row label { display: grid; gap: 5px; color: var(--text-2); font-size: 13px; }
+      .own-row input { font: inherit; font-weight: 600; border-radius: 12px; border: 1px solid #2c3546; background: #0e131b; color: var(--text); padding: 11px 14px; }
+      .own-row input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+      .own .small { margin: 14px 0 0; }
       .small { color: var(--text-3); font-size: 13px; margin: 0 0 8px; }
       .small.warn { color: var(--caution); }
       footer { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 13px; }
@@ -103,6 +109,30 @@
         <button data-scenario="fake">Approve “USDT” (fake token)</button>
         <button data-scenario="phish">Sign in (for another site)</button>
       </div>
+
+      <h2>Write the button yourself <small>· what a button says against what it asks for</small></h2>
+      <section class="site own" aria-label="A made-up site with a button you write">
+        <span class="tag">Made-up site. You write the button.</span>
+        <h3>Season 2 rewards</h3>
+        <div class="own-row">
+          <label>
+            Words on the button
+            <input id="own-label" type="text" maxlength="60" value="Check eligibility" autocomplete="off" spellcheck="false" />
+          </label>
+          <label>
+            What it really asks the wallet for
+            <select id="own-kind">
+              <option value="ownPermission">A permission to take any amount of USDT</option>
+              <option value="ownSignin">A sign-in for this site: nothing moves</option>
+            </select>
+          </label>
+        </div>
+        <button class="cta" id="own-press" data-scenario="ownPermission">Check eligibility</button>
+        <p class="small">
+          Guardian reads plain words itself (Claim, Verify, Approve, Stake). Words it cannot read, such as “Continue”,
+          “Получить бонус” or “立即领取”, Gemini reads: on your device when it can, in the cloud only if you allow it.
+        </p>
+      </section>
 
       <h2>Ordinary requests <small>· Guardian should stay calm</small></h2>
       <div class="grid">

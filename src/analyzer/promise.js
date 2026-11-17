@@ -13,11 +13,13 @@
 // permission; or a mint, swap, payment or stake that asks for every item in
 // a collection.
 
-// The offers code can read from a button's words. Order matters: the first
-// that matches wins ("Claim and stake" is a claim).
+// The offers code can read from a button's words. A button may name more
+// than one ("Approve and claim"): all of them count, and only a button whose
+// every offer contradicts the request is a warning. The first is the one
+// shown.
 export const OFFERS = {
   receive: {
-    words: /\b(?:claim|airdrop|reward|rewards|bonus|free|giveaway|redeem|collect|receive|get\s+(?:your|free|my)|win|prize|refund)\b/i,
+    words: /\b(?:claim|airdrop|reward|rewards|bonus|free|giveaway|redeem|collect|receive|get\s+(?:your|free|my)|win|prize|refund|eligib\w*)\b/i,
     label: 'receive something',
   },
   revoke: { words: /\b(?:revoke|disconnect|remove\s+(?:access|approval|permission)|cancel\s+approval)\b/i, label: 'remove a permission' },
@@ -29,7 +31,7 @@ export const OFFERS = {
   swap: { words: /\b(?:swap|exchange|trade|buy|bridge)\b/i, label: 'swap or buy' },
   pay: { words: /\b(?:pay|send|donate|deposit|checkout|purchase|tip|transfer)\b/i, label: 'pay' },
   stake: { words: /\b(?:stake|unstake|farm|lock)\b/i, label: 'stake' },
-  approve: { words: /\b(?:approve|enable|allow|unlock|list|sell)\b/i, label: 'approve or list' },
+  approve: { words: /\b(?:approve|approval|permission|permit|authori[sz]e|grant|enable|allow|unlock|list|sell)\b/i, label: 'approve or list' },
 };
 export const OFFER_KINDS = Object.keys(OFFERS);
 
@@ -57,10 +59,16 @@ export function cleanPromise(raw) {
   return { button, title: clean(raw.title), heading: clean(raw.heading), ageMs: Math.round(ageMs) };
 }
 
-/** What a button's words offer, as code reads them, or null if unclear. */
+/** Every offer code reads in a button's words, in the list's order. */
+export function offersOf(button) {
+  return Object.entries(OFFERS)
+    .filter(([, offer]) => offer.words.test(button))
+    .map(([kind]) => kind);
+}
+
+/** The first offer code reads in a button's words, or null if unclear. */
 export function offerOf(button) {
-  for (const [kind, offer] of Object.entries(OFFERS)) if (offer.words.test(button)) return kind;
-  return null;
+  return offersOf(button)[0] || null;
 }
 
 const sub = (r) => r.subject || {};
@@ -105,21 +113,26 @@ export function whatItDoes(r) {
   }
 }
 
-/**
- * Whether an offer contradicts the decoded request. Returns the code's
- * sentence about it, or null.
- */
-export function contradiction(offer, result, button) {
-  if (!offer) return null;
+/** Whether one offer contradicts the decoded request. */
+function clashes(offer, result) {
   const out = takesOut(result);
   const grants = partsOf(result).some((p) => GRANTS.has(sub(p).action));
   const collection = partsOf(result).some((p) => sub(p).action === 'approveAll');
-  let clash = false;
-  if (offer === 'receive' || offer === 'sign_in') clash = out;
-  else if (offer === 'revoke') clash = out || grants;
-  else if (['mint', 'swap', 'pay', 'stake'].includes(offer)) clash = collection;
-  if (!clash) return null;
-  return `The button you pressed said ${quote(button)}, an offer to ${OFFERS[offer].label}, but this request ${whatItDoes(result)}.`;
+  if (offer === 'receive' || offer === 'sign_in') return out;
+  if (offer === 'revoke') return out || grants;
+  if (['mint', 'swap', 'pay', 'stake'].includes(offer)) return collection;
+  return false;
+}
+
+/**
+ * Whether what a button offers contradicts the decoded request: only when
+ * every offer read in it does ("Approve and claim" names the permission, so
+ * it does not). `offers`: one offer or a list. Returns code's sentence, or null.
+ */
+export function contradiction(offers, result, button) {
+  const list = (Array.isArray(offers) ? offers : [offers]).filter((o) => OFFERS[o]);
+  if (list.length === 0 || !list.every((o) => clashes(o, result))) return null;
+  return `The button you pressed said ${quote(button)}, an offer to ${OFFERS[list[0]].label}, but this request ${whatItDoes(result)}.`;
 }
 
 /** A button's words in quotes; its own double quotes become single ones. */
