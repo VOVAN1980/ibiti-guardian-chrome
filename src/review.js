@@ -8,10 +8,18 @@
 // fallback) or asks for the deeper analysis.
 
 import { analyze } from './analyzer/index.js';
-import { analyzeInCloud, cloudReady, deviceModelStatus, downloadDeviceModel, readHybrid, readOnDevice } from './ai/engine.js';
+import {
+  analyzeInCloud,
+  cloudReady,
+  deviceModelStatus,
+  downloadDeviceModel,
+  readHybrid,
+  readInCloud,
+  readOnDevice,
+} from './ai/engine.js';
 import { codeSentence, isUndecoded, ownAddresses, scrubAddresses, scrubResult } from './ai/guard.js';
 import { deepPrompt, meaning, readingPrompt, shownReasons } from './ai/prompt.js';
-import { checkAnalysis, checkExplanation, mostImportant } from './ai/reading.js';
+import { PATTERN_NOTE, checkAnalysis, checkExplanation, mostImportant } from './ai/reading.js';
 import {
   allowCloudFallback,
   closeReview,
@@ -121,7 +129,8 @@ function render(record, result) {
 // code; Gemini's own reading of the request, checked against the decoder,
 // adds the reasons it finds most important. On this computer by default;
 // with the user's permission, the SDK's hybrid mode falls back to the cloud
-// when this computer has no on-device model ──
+// when this computer has no on-device model, and the cloud reads the request
+// once more when Gemini Nano's answer does not pass the check ──
 
 function setChip(element, source, ms, label) {
   element.dataset.source = source;
@@ -172,29 +181,36 @@ function showSent(prompt, sent) {
   $('local-sent-box').hidden = false;
 }
 
-/** The one-time permission, offered only when this computer has no model. */
-function offerFallback(result, host) {
+/**
+ * The one-time permission: offered when this computer has no model, or when
+ * Gemini Nano's answer did not pass Guardian's check (`afterNano`). The same
+ * permission covers both, and says so.
+ */
+function offerFallback(result, host, { afterNano = false } = {}) {
   if (!cloudReady) return;
   if (isPreview) {
     $('local-fallback-note').textContent =
-      'Gemini in the cloud then explains instead, through Firebase, for the rest of this visit whenever this browser ' +
-      'has no on-device model. Sends the decoded details below, never your wallet address.';
+      'For the rest of this visit, Gemini in the cloud then reads the request through Firebase whenever this browser ' +
+      'has no on-device model, and once more whenever Gemini Nano’s answer does not pass Guardian’s check. ' +
+      'Sends the decoded details below, never your wallet address.';
   }
   showSent(cloudPrompt(result, host), false);
   $('local-fallback').hidden = false;
   const allow = $('local-fallback-allow');
+  allow.disabled = false;
   allow.onclick = async () => {
     allow.disabled = true;
     await allowCloudFallback();
     $('local-fallback').hidden = true;
     $('local-download').hidden = true;
-    await runLocal(result, host);
+    // Gemini Nano has already answered this one: only the cloud is asked now.
+    await runLocal(result, host, { cloudOnly: afterNano });
   };
 }
 
 // A cloud call that never starts (on the hosted demo, reCAPTCHA blocked by a
 // privacy tool or a network filter) must not leave the window waiting.
-const CLOUD_TIMEOUT_MS = 30000;
+const CLOUD_TIMEOUT_MS = 45000;
 
 /**
  * Waits for `promise` at most `ms`. On time-out it also calls `onTimeout`,
@@ -237,7 +253,7 @@ function cloudRequestsBetween(since, until) {
 /** Why a cloud call failed, in words the user can act on. */
 function cloudProblem(error) {
   const message = String((error && error.message) || error);
-  if (error && error.name === 'TimeoutError') return 'The cloud did not answer within 30 seconds.';
+  if (error && error.name === 'TimeoutError') return 'The cloud did not answer within 45 seconds.';
   if (/free tier is not available|billing/i.test(message)) {
     return 'Cloud AI is not switched on for this Firebase project yet.';
   }
@@ -294,14 +310,20 @@ function showCheck(box, textEl, text) {
   box.hidden = false;
 }
 
-async function runLocal(result, host) {
+/**
+ * `cloudOnly`: Gemini Nano has already answered this request and its reading
+ * did not match; the user has just allowed the cloud, so only the cloud is asked.
+ */
+async function runLocal(result, host, { cloudOnly = false } = {}) {
   const text = $('local-text');
   const note = $('local-note');
   const meta = $('local-meta');
   const status = await deviceModelStatus();
-  const deviceReady = status === 'available';
-  const canDownload = status === 'downloadable' || status === 'downloading';
   const hybrid = cloudReady && (await cloudFallbackAllowed());
+  // Only with the permission on: the cloud prompt is the one without the balance.
+  cloudOnly = cloudOnly && hybrid;
+  const deviceReady = status === 'available' && !cloudOnly;
+  const canDownload = status === 'downloadable' || status === 'downloading';
   document.body.dataset.local = status;
   document.body.dataset.fallback = hybrid ? 'on' : 'off';
 
@@ -313,7 +335,7 @@ async function runLocal(result, host) {
   note.hidden = true;
   note.textContent = '';
   note.classList.remove('pending', 'muted');
-  for (const key of ['source', 'checked', 'withheld', 'withheldDetail', 'reading', 'stopped', 'localError', 'top']) {
+  for (const key of ['source', 'checked', 'withheld', 'withheldDetail', 'reading', 'stopped', 'localError', 'top', 'retried', 'nanoWithheld']) {
     delete document.body.dataset[key];
   }
 
@@ -364,18 +386,47 @@ async function runLocal(result, host) {
   const stop = new AbortController();
   const stopListening = hybrid ? onCloudFallbackOff(() => stop.abort(new Error('cloud turned off'))) : () => {};
   let run = null;
+  // Gemini Nano's answer, when its reading did not match and the cloud was
+  // asked once more.
+  let nano = null;
   try {
-    run = hybrid ? readHybrid(prompt, { deviceReady, signal: stop.signal }) : readOnDevice(prompt);
-    const out = toCloud ? await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e)) : await run;
-    const verdict = checkExplanation(out.text, result, { shown });
+    run = cloudOnly
+      ? readInCloud(prompt, { signal: stop.signal })
+      : hybrid
+        ? readHybrid(prompt, { deviceReady, signal: stop.signal })
+        : readOnDevice(prompt);
+    let out = toCloud ? await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e)) : await run;
+    let verdict = checkExplanation(out.text, result, { shown });
+    // Gemini Nano's reading did not match the decoder. With the user's
+    // permission, Gemini in the cloud reads the request once more.
+    if (verdict.checked !== 'passed' && out.source === 'on_device' && hybrid) {
+      nano = { out, verdict };
+      note.textContent = 'Gemini Nano’s answer did not pass Guardian’s check. Asking Gemini in the cloud once, as you allowed…';
+      run = readInCloud(prompt, { signal: stop.signal });
+      out = await withTimeout(run, CLOUD_TIMEOUT_MS, (e) => stop.abort(e));
+      verdict = checkExplanation(out.text, result, { shown });
+    }
     note.classList.remove('pending');
     setChip($('local-chip'), out.source, out.ms, 'Cloud fallback');
     const requests = cloudRequestsBetween(started, performance.now());
     const onDeviceRun = out.source === 'on_device';
     const model = onDeviceRun ? 'Gemini Nano on your computer' : 'Gemini in the cloud';
-    meta.textContent = onDeviceRun
-      ? `Gemini Nano ran in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`
-      : 'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
+    const nanoFirst = nano
+      ? `Gemini Nano on your computer ${
+          nano.verdict.problem === 'no usable answer'
+            ? 'gave no usable answer'
+            : `read the request differently from Guardian’s decoder (${differed(nano.verdict.problem)})`
+        }, so Gemini in the cloud read it once more, as you allowed. `
+      : '';
+    if (onDeviceRun) {
+      meta.textContent = `Gemini Nano ran in Chrome on your computer${requests === 0 ? ': nothing was sent to an AI service' : ''}.`;
+    } else if (nano || cloudOnly) {
+      meta.textContent =
+        'Gemini Nano’s answer did not pass Guardian’s check, so Gemini in the cloud read the request through Firebase, as you allowed. Your wallet address was not sent.';
+    } else {
+      meta.textContent =
+        'No on-device model here, so Gemini answered in the cloud through Firebase, as you allowed. Your wallet address was not sent.';
+    }
     if (verdict.checked === 'passed') {
       note.hidden = true;
       note.textContent = '';
@@ -383,7 +434,7 @@ async function runLocal(result, host) {
       showCheck(
         $('local-check-box'),
         $('local-check'),
-        `${model} read the decoded facts on its own, without Guardian’s sentence, and answered a form. Its reading matched Guardian’s decoder: ${verdict.words}. Only then were its picks used. ${WRITTEN_BY_GUARDIAN}`,
+        `${nanoFirst}${model} read the decoded facts on its own, without Guardian’s sentence, and answered a form. Its reading matched Guardian’s decoder: ${verdict.words}. Only then were its picks used. ${WRITTEN_BY_GUARDIAN}`,
       );
     } else {
       note.classList.add('muted');
@@ -391,14 +442,21 @@ async function runLocal(result, host) {
       showCheck(
         $('local-check-box'),
         $('local-check'),
-        verdict.problem === 'no usable answer'
-          ? `${model} gave no usable answer, so none of it was used. ${WRITTEN_BY_GUARDIAN}`
-          : `${model} read the request differently from Guardian’s decoder (${differed(verdict.problem)}), so none of its answer was used. ${WRITTEN_BY_GUARDIAN}`,
+        `${nanoFirst}${
+          verdict.problem === 'no usable answer'
+            ? `${model} gave no usable answer, so none of it was used.`
+            : `${model} read the request differently from Guardian’s decoder (${differed(verdict.problem)}), so none of its answer was used.`
+        } ${WRITTEN_BY_GUARDIAN}`,
       );
+      // Gemini Nano's answer was not used and the cloud is not allowed: offer
+      // it, for this and the next requests.
+      if (onDeviceRun && !hybrid) offerFallback(result, host, { afterNano: true });
     }
     meta.hidden = false;
     if (!onDeviceRun) showSent(prompt, true);
-    $('local-chip').title = `Answered after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
+    $('local-chip').title = nano
+      ? `Gemini Nano answered after ${seconds(nano.out.ms)}; Gemini in the cloud after ${seconds(out.ms)} more. Network requests from this window meanwhile: ${requests}.`
+      : `Answered after ${seconds(out.ms)}. Network requests from this window meanwhile: ${requests}.`;
     Object.assign(document.body.dataset, {
       local: 'done',
       source: out.source,
@@ -407,11 +465,15 @@ async function runLocal(result, host) {
       checked: verdict.checked,
       reading: out.text.slice(0, 2000), // tests and logs only
     });
+    if (nano) {
+      document.body.dataset.retried = 'cloud';
+      document.body.dataset.nanoWithheld = nano.verdict.problem || ''; // tests and logs only
+    }
     if (verdict.problem) {
       document.body.dataset.withheld = verdict.problem;
       document.body.dataset.withheldDetail = verdict.detail || ''; // tests and logs only
     }
-    saveLastExplanation({ source: out.source, ms: out.ms, requests, checked: verdict.checked });
+    saveLastExplanation({ source: out.source, ms: out.ms, requests, checked: verdict.checked, retried: Boolean(nano) });
   } catch (error) {
     if (run) run.catch(() => {}); // a late failure after the time-out
     note.classList.remove('pending');
@@ -422,6 +484,10 @@ async function runLocal(result, host) {
     if (turnedOff) {
       note.textContent = 'Cloud AI was turned off, so Gemini was stopped. The facts below do not depend on it.';
       document.body.dataset.stopped = 'turned-off';
+    } else if (nano) {
+      // The cloud did not answer the second reading; Gemini Nano's was not used.
+      note.textContent = `Gemini’s answer was not used this time. ${cloudProblem(error)} The facts below do not depend on it.`;
+      document.body.dataset.retried = 'cloud';
     } else if (toCloud) {
       note.textContent = `${cloudProblem(error)} The facts below do not depend on it.`;
       meta.textContent = isPreview
@@ -482,6 +548,10 @@ function wireCloud(result, host) {
       if (verdict.passed) {
         $('cloud-pattern').textContent = verdict.label;
         $('cloud-pattern').hidden = false;
+        // A known pattern is a shape, not proof: code says so under it.
+        const known = !['no_known_pattern', 'cannot_determine'].includes(verdict.pattern);
+        $('cloud-pattern-note').textContent = known ? PATTERN_NOTE : '';
+        $('cloud-pattern-note').hidden = !known;
         $('cloud-checks').append(
           ...verdict.checks.map((item) => {
             const li = document.createElement('li');
@@ -503,6 +573,7 @@ function wireCloud(result, host) {
       } else {
         $('cloud-pattern').textContent = '';
         $('cloud-pattern').hidden = true;
+        $('cloud-pattern-note').hidden = true;
         $('cloud-checks-label').hidden = true;
         $('cloud-confirm').textContent = 'Gemini’s analysis was not used this time. The facts above are Guardian’s own.';
         $('cloud-confirm').hidden = false;

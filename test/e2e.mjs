@@ -181,7 +181,7 @@ await step('cloud analysis runs only after the user asks for it', async () => {
     assert.equal(await walletLog(), 1, 'nothing reached the wallet without a decision');
 
     await review.click('#cloud-ask');
-    await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 40000 });
+    await review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.cloud), { timeout: 60000 });
     const cloudError = await review.evaluate(() => document.body.dataset.cloudError || '');
     if (/free tier is not available|billing/i.test(cloudError)) {
       // The Firebase project has no paid tier: the request was made (after
@@ -199,6 +199,7 @@ await step('cloud analysis runs only after the user asks for it', async () => {
       withheld: `${document.body.dataset.cloudWithheld || ''} [${document.body.dataset.cloudWithheldDetail || ''}]`,
       kind: document.body.dataset.patternKind,
       pattern: document.getElementById('cloud-pattern').textContent,
+      patternNote: document.getElementById('cloud-pattern-note').hidden ? '' : document.getElementById('cloud-pattern-note').textContent,
       reading: document.body.dataset.cloudReading,
     }));
     assert.equal(cloud.state, 'done');
@@ -209,7 +210,8 @@ await step('cloud analysis runs only after the user asks for it', async () => {
     assert.ok(cloud.summary.length > 20, 'cloud summary is present');
     assert.ok(cloud.checks >= 1, 'cloud analysis lists things to check');
     assert.equal(cloud.kind, 'approval_phishing', cloud.pattern);
-    assert.match(cloud.pattern, /^Matches a known scam pattern: approval phishing/);
+    assert.match(cloud.pattern, /^Has the shape of approval phishing/);
+    assert.match(cloud.patternNote, /A pattern is not proof of a scam/);
     assert.ok(calls.some((url) => url.includes('googleapis.com')), 'the cloud call went through Firebase');
     console.log(`     cloud: ${cloud.chip} | ${cloud.summary}`);
   } finally {
@@ -278,7 +280,7 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
     assert.deepEqual(first.calls, [], 'nothing is sent before the user allows it');
 
     await first.review.click('#local-fallback-allow');
-    await first.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 40000 });
+    await first.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 60000 });
     const out = await first.review.evaluate(() => ({
       local: document.body.dataset.local,
       source: document.body.dataset.source,
@@ -319,7 +321,7 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
   // The next request: no click, the explanation comes by itself.
   const second = await reviewWithCalls('permit');
   try {
-    await second.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 40000 });
+    await second.review.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 60000 });
     const out = await second.review.evaluate(() => ({
       local: document.body.dataset.local,
       fallback: document.body.dataset.fallback,
@@ -655,6 +657,123 @@ for (const [name, answer] of Object.entries(NANO_CASES)) {
   });
 }
 
+// When Gemini Nano's answer does not pass the check, Gemini in the cloud
+// reads the request once more: only with the user's permission, which says
+// so. The cloud's answer here is a stand-in (the request is answered by the
+// test), so the outcome is checked every time and no quota is used.
+const fakeNano = (text) => {
+  window.__nano = [];
+  self.LanguageModel = {
+    availability: async () => 'available',
+    create: async () => ({
+      prompt: async (contents) => {
+        window.__nano.push(JSON.stringify(contents));
+        return text;
+      },
+      destroy: () => {},
+    }),
+  };
+};
+/** A Gemini API response holding `text`, as the SDK reads it. */
+const geminiReply = (text) => ({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP', index: 0 }] }),
+});
+for (const allowed of [true, false]) {
+  await step(
+    allowed
+      ? 'Gemini Nano’s reading fails the check: with the permission, the cloud reads it once more'
+      : 'Gemini Nano’s reading fails the check: without the permission, nothing is sent until the user allows it',
+    async () => {
+      const worker = browser.targets().find((t) => t.type() === 'service_worker' && t.url().endsWith('/background.js'));
+      const panel = await browser.newPage();
+      await panel.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`, { waitUntil: 'load' });
+      await panel.waitForFunction(() => !/Checking/.test(document.getElementById('fallback-text').textContent));
+      if (await panel.evaluate(() => document.getElementById('fallback').disabled)) {
+        await panel.close();
+        console.log('     Nano → cloud: SKIPPED, cloud is not set up in this build');
+        return;
+      }
+      const setFallback = (on) => panel.evaluate((v) => chrome.storage.local.set({ cloudFallback: v }), on);
+      const first = await reviewWithCalls('claim');
+      let tab = null;
+      try {
+        await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
+        await setFallback(allowed);
+        tab = await browser.newPage();
+        await tab.setRequestInterception(true);
+        const sent = [];
+        tab.on('request', (request) => {
+          const url = request.url();
+          if (url.startsWith('chrome-extension://')) return request.continue().catch(() => {});
+          if (/generatecontent/i.test(url)) {
+            sent.push(request.postData() || '');
+            return request.respond(geminiReply(JSON.stringify(RIGHT))).catch(() => {});
+          }
+          return request.continue().catch(() => {}); // App Check's token exchange
+        });
+        await tab.evaluateOnNewDocument(fakeNano, JSON.stringify({ ...RIGHT, who_gains: 'you' }));
+        tab.goto(first.review.url()).catch(() => {});
+        await tab.waitForFunction(() => ['done', 'error'].includes(document.body.dataset.local), { timeout: 60000, polling: 200 });
+        const read = () =>
+          tab.evaluate(() => ({
+            source: document.body.dataset.source,
+            checked: document.body.dataset.checked,
+            retried: document.body.dataset.retried || null,
+            chip: document.getElementById('local-chip').textContent,
+            important: [...document.querySelectorAll('#local-top li')].map((li) => `${li.dataset.reason}:${li.dataset.by}`),
+            check: document.getElementById('local-check').textContent,
+            meta: document.getElementById('local-meta').textContent,
+            offer: !document.getElementById('local-fallback').hidden,
+            button: document.getElementById('local-fallback-allow').textContent,
+            consent: document.getElementById('local-fallback-note').textContent,
+            main: [...document.querySelectorAll('#local > :not(details)')].filter((e) => !e.hidden).map((e) => e.innerText).join(' '),
+            nano: window.__nano.length,
+          }));
+        let out = await read();
+        assert.equal(out.nano, 1, 'Gemini Nano answered once');
+        if (allowed) {
+          assert.equal(sent.length, 1, 'one cloud request, after Gemini Nano');
+          assert.equal(out.retried, 'cloud');
+          assert.equal(out.source, 'in_cloud');
+          assert.equal(out.checked, 'passed');
+          assert.match(out.chip, /^Cloud fallback · \d/);
+          assert.deepEqual(out.important, ['1:guardian', '2:guardian', '3:gemini', '4:gemini']);
+          assert.match(out.check, /^Gemini Nano on your computer read the request differently from Guardian’s decoder \(who gains\), so Gemini in the cloud read it once more, as you allowed\./);
+          assert.match(out.meta, /as you allowed\. Your wallet address was not sent\./);
+        } else {
+          // Not used, nothing sent; the permission is offered, saying what it covers.
+          assert.deepEqual(sent, [], 'nothing was sent');
+          assert.equal(out.checked, 'withheld');
+          assert.deepEqual(out.important, ['1:guardian', '2:guardian']);
+          assert.equal(out.offer, true);
+          assert.equal(out.button, 'Allow cloud AI as a fallback');
+          assert.match(out.consent, /once more whenever Gemini Nano’s answer does not pass Guardian’s check/);
+          // The user allows it: only the cloud is asked now, not Gemini Nano again.
+          await tab.click('#local-fallback-allow');
+          await tab.waitForFunction(() => document.body.dataset.local === 'done' && document.body.dataset.source === 'in_cloud', { timeout: 60000, polling: 200 });
+          out = await read();
+          assert.equal(out.nano, 1, 'Gemini Nano was not asked again');
+          assert.equal(sent.length, 1, 'one cloud request');
+          assert.equal(out.checked, 'passed');
+          assert.match(out.meta, /Gemini Nano’s answer did not pass Guardian’s check, so Gemini in the cloud read the request/);
+        }
+        const prompt = promptOf(sent[0]);
+        const user = (await page.evaluate(() => window.ethereum.request({ method: 'eth_accounts' })))[0].toLowerCase();
+        assert.ok(prompt.length > 200 && !prompt.toLowerCase().includes(user.slice(2)), 'the cloud-safe prompt, without the user’s address');
+        assert.ok(!prompt.includes('without asking you again, until you revoke it'), 'not the code’s sentence');
+        assert.doesNotMatch(out.main, /agree|approved|✓/i);
+      } finally {
+        await setFallback(false).catch(() => {});
+        if (tab) await tab.close().catch(() => {});
+        await panel.close().catch(() => {});
+        await rejectAndWait(first.review);
+      }
+    },
+  );
+}
+
 // However the AI service fails, the facts are there at once and Reject and
 // Continue keep working: the AI is never in the way of the decision.
 let expectedWallet = 1;
@@ -716,13 +835,13 @@ for (const mode of ['unreachable', 'over quota', 'silent', 'timed out']) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         assert.notEqual(await tab.evaluate(() => document.body.dataset.local), 'done');
       } else {
-        const wait = mode === 'timed out' ? 40000 : 20000;
+        const wait = mode === 'timed out' ? 60000 : 20000;
         await tab.waitForFunction(() => document.body.dataset.local === 'error', { timeout: wait });
         const said = await tab.evaluate(() => document.getElementById('local-note').textContent);
         const expected = {
           unreachable: /could not be reached\. The facts below do not depend on it/,
           'over quota': /busy right now \(usage limit\)\. The facts below do not depend on it/,
-          'timed out': /did not answer within 30 seconds\. The facts below do not depend on it/,
+          'timed out': /did not answer within 45 seconds\. The facts below do not depend on it/,
         }[mode];
         assert.match(said, expected);
       }

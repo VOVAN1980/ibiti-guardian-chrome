@@ -56,17 +56,19 @@ on ordinary requests.
 ## How the hybrid AI is used
 
 Firebase AI Logic hybrid inference. Gemini reads every request Guardian can
-decode, on the computer whenever Gemini Nano is there; once the user has
+decode, on the computer whenever Gemini Nano is there. Once the user has
 allowed the cloud, the SDK falls back to Gemini in the cloud on computers
-without it. The answer is always a form, never text for the user.
+without it, and when Gemini Nano's answer does not pass Guardian's check,
+Gemini in the cloud reads the request once more. The answer is always a form,
+never text for the user.
 
 | | Gemini's reading | Gemini's reading, cloud allowed | Deeper analysis |
 |---|---|---|---|
-| Mode | `ONLY_ON_DEVICE` | `PREFER_ON_DEVICE` | `ONLY_IN_CLOUD` |
+| Mode | `ONLY_ON_DEVICE` | `PREFER_ON_DEVICE`; then `ONLY_IN_CLOUD` once if Nano's answer fails the check | `ONLY_IN_CLOUD` |
 | Answer | A JSON form (Prompt API `responseConstraint`) | The same form (`responseConstraint` on device, `responseJsonSchema` in the cloud) | A JSON form (`responseJsonSchema`) |
 | Model | Gemini Nano, built into Chrome | Gemini Nano if ready, else `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` |
-| When | By itself (the default) | By itself, after a one-time **Use cloud AI when this computer has none** | Only after the user presses **Ask cloud AI** |
-| Sent to an AI service | Nothing | Nothing when Nano answers; otherwise the decoded facts | The decoded facts |
+| When | By itself (the default) | By itself, after a one-time **Allow cloud AI as a fallback** | Only after the user presses **Ask cloud AI** |
+| Sent to an AI service | Nothing | Nothing when Nano's answer passes; otherwise the decoded facts | The decoded facts |
 | Protected by | — (no network call) | Firebase App Check | Firebase App Check |
 
 **Who writes what.** Every word in Guardian's window is written by code.
@@ -95,18 +97,23 @@ the form against the decoded request before using any of it.
   Gemini "agrees" (that could read as an all-clear); how its answer was
   checked is under **How Gemini's answer was checked**.
 - **The deeper analysis** answers the same reading, plus a scam pattern and
-  the things to check, each picked from a fixed list written in code. Code
-  checks that the request has what the pattern and each check are about —
-  "permit phishing" only on a permit signature, never a known scam on a
-  request with no red flags, never "no known pattern" on a high-risk request
-  that has one — and adds the checks that must always be shown (marked ⚠).
+  the things to check, each picked from a fixed list written in code. A known
+  pattern needs evidence the analyzer found: an approval, a permit or a batch
+  is no scam by itself, so a pattern is accepted only on a request Guardian
+  rates high risk, with its warnings, and only one that request has the shape
+  of ("permit phishing" only on a permit signature). Marketplace orders are
+  not on the list: Guardian cannot see an order's price. The label says *Has
+  the shape of …*, and under it: *A pattern is not proof of a scam*. On a
+  high-risk request with a fitting pattern, "no known pattern" is not
+  accepted. Code adds the checks that must always be shown (marked ⚠).
 
 Measured on 2026-11-17 on the demo's requests: Gemini in the cloud read 27
 of 27 the way the decoder did (and 25 of 25 deeper analyses fit); Gemini Nano
 in Chrome read 6 of 9 (it took a collection approval for several actions,
 and a revoke and a sign-in for another site as something that takes assets).
 When a reading differs, nothing from it is used and Guardian's own text and
-warnings stand alone.
+warnings stand alone; with the user's permission, Gemini in the cloud then
+reads the request once more, and its answer is checked the same way.
 
 What this does and does not prove: Gemini cannot put an amount, an address,
 a token, a role or a direction on screen that the decoder did not find, and
@@ -115,8 +122,11 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
 `npm run test:e2e`), and the analyzer's decoding is what the window stands on.
 
 - The permission is off until the user turns it on, in Guardian's window or
-  its toolbar panel (where it can be turned off again). The hosted demo keeps
-  it for the visit only.
+  its toolbar panel (where it can be turned off again). It says what it
+  covers: no on-device model, or Gemini Nano's answer not passing the check.
+  Without it nothing goes to the cloud; after a failed Nano answer the window
+  offers it, and only the cloud is asked then. The hosted demo keeps it for
+  the visit only.
 - **Exactly what would be sent** shows the full text next to the one-time
   permission, and **Exactly what was sent** after every cloud answer. It
   never holds the user's wallet address or balance; for a payment measured
@@ -149,9 +159,9 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
 3. Press **Turn Guardian off to see the difference** and click again: the
    same request goes straight to the wallet.
 
-On-device explanations need a Chrome that has Gemini Nano (built-in AI).
-Without it, press **Use cloud AI when this computer has none** once, and
-Gemini in the cloud explains instead for the rest of the visit. The facts, the
+Gemini's on-device reading needs a Chrome that has Gemini Nano (built-in
+AI). Without it, press **Allow cloud AI as a fallback** once, and Gemini in
+the cloud reads the requests instead for the rest of the visit. The facts, the
 decision and the deeper analysis do not depend on either.
 
 <img src="docs/playground.png" alt="The hosted playground" width="640">
