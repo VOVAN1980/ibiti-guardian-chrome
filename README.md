@@ -149,6 +149,12 @@ When a reading differs, nothing from it is used and Guardian's own text and
 warnings stand alone; with the user's permission, Gemini in the cloud then
 reads the request once more, and its answer is checked the same way.
 
+While Gemini reads, the window counts the seconds and says the user can
+decide without it: the facts, the warnings and both buttons are there from
+the start. Gemini Nano usually answers in 15–30 seconds; it has twice not
+answered at all, so after 90 seconds Guardian stops waiting, says *no answer
+in 90 s*, and treats it like an answer that did not pass.
+
 What this does and does not prove: Gemini cannot put an amount, an address,
 a token, a role or a direction on screen that the decoder did not find, and
 it cannot hide a warning. It does not prove the rest of Guardian is free of

@@ -210,6 +210,13 @@ section > h2 {
   color: #72b8ff;
 }
 
+/* Gemini Nano gave no answer in time: nothing to show as a result. */
+.chip[data-source='none'] {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text-3);
+}
+
 .ai-text {
   margin: 0;
   font-size: 15px;
