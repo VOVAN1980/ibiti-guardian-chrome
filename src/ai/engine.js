@@ -22,7 +22,7 @@ import { GoogleAIBackend, InferenceMode, getAI, getGenerativeModel } from 'fireb
 import { cloudReady, startAppCheck } from 'guardian-appcheck';
 import { firebaseConfig } from 'guardian-config';
 import { ON_DEVICE_PARAMS, deviceModelStatus } from './device.js';
-import { DEEP_SCHEMA, READING_SCHEMA } from './reading.js';
+import { DEEP_SCHEMA, DEVICE_READING_SCHEMA, READING_SCHEMA } from './reading.js';
 
 /** False when this build has no way to pass App Check, so cloud is off. */
 export { cloudReady };
@@ -69,12 +69,51 @@ export async function downloadDeviceModel(onProgress) {
 // schema to it as well (measured on Gemini Nano: it read more requests right).
 const deviceParams = (signal) => ({
   ...ON_DEVICE_PARAMS,
-  promptOptions: { responseConstraint: READING_SCHEMA, omitResponseConstraintInput: true, ...(signal ? { signal } : {}) },
+  promptOptions: { responseConstraint: DEVICE_READING_SCHEMA, omitResponseConstraintInput: true, ...(signal ? { signal } : {}) },
 });
 const cloudParams = (schema) => ({
   model: CLOUD_MODEL,
   generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, temperature: 0.2 },
 });
+
+// Chrome goes on generating after a prompt is aborted, even after its page
+// is closed: seen with Gemini Nano on 2026-11-17, minutes of CPU after the
+// window had stopped waiting. Destroying the session stops it at once. The
+// SDK keeps its session to itself, so the sessions created in this window
+// are kept here too, and destroyed when the window stops waiting for Gemini
+// Nano or goes away.
+const sessions = new Set();
+function stopDevice() {
+  for (const session of sessions) {
+    try {
+      session.destroy();
+    } catch {
+      // already gone
+    }
+  }
+  sessions.clear();
+}
+function keepSessions() {
+  const lm = self.LanguageModel;
+  if (!lm || keepSessions.done) return;
+  keepSessions.done = true;
+  try {
+    const create = lm.create.bind(lm);
+    lm.create = async (...args) => {
+      const session = await create(...args);
+      sessions.add(session);
+      return session;
+    };
+    self.addEventListener('pagehide', stopDevice);
+  } catch {
+    // Chrome would not let it be wrapped: the time-out still stops waiting.
+  }
+}
+/** Gemini Nano stops generating when `signal` aborts (the window's time-out). */
+function stopOnAbort(signal) {
+  keepSessions();
+  if (signal) signal.addEventListener('abort', stopDevice, { once: true });
+}
 
 /** One answer, timed, with where the SDK ran it. */
 async function answer(model, prompt, signal) {
@@ -93,6 +132,7 @@ async function answer(model, prompt, signal) {
  * @returns {{text: string, ms: number, source: string}}  text: the form, as JSON
  */
 export async function readOnDevice(prompt, { deviceSignal } = {}) {
+  stopOnAbort(deviceSignal);
   const model = getGenerativeModel(onDevice(), {
     mode: InferenceMode.ONLY_ON_DEVICE,
     onDeviceParams: deviceParams(deviceSignal),
@@ -118,10 +158,12 @@ export async function readOnDevice(prompt, { deviceSignal } = {}) {
  *
  * `signal` stops a cloud request that has not gone out yet (the user turned
  * the permission off): the SDK checks it right before sending.
- * `deviceSignal` stops Gemini Nano's answer (the window's time-out).
+ * `deviceSignal` stops Gemini Nano's answer (the window's time-out), and
+ * its generation with it.
  * @returns {{text: string, ms: number, source: string}}
  */
 export async function readHybrid(prompt, { deviceReady = false, signal, deviceSignal } = {}) {
+  stopOnAbort(deviceSignal);
   const model = getGenerativeModel(deviceReady ? onDevice() : inCloud(), {
     mode: InferenceMode.PREFER_ON_DEVICE,
     onDeviceParams: deviceParams(deviceSignal),

@@ -623,3 +623,23 @@ test('the button check, after the review of 2026-11-18: revoke phrases, lure wor
   const pattern = (file) => readFileSync(new URL(file, import.meta.url), 'utf8').match(/const ADDRESS = (.*);/)[1];
   assert.equal(pattern('../src/inpage.js'), pattern('../src/analyzer/promise.js'));
 });
+
+test('Gemini Nano’s response constraint leaves nothing to run on with', async () => {
+  const { READING_SCHEMA, DEVICE_READING_SCHEMA, REASON_NUMBERS } = await import('../src/ai/reading.js');
+  // The same form as the cloud's schema...
+  assert.deepEqual(Object.keys(DEVICE_READING_SCHEMA.properties), Object.keys(READING_SCHEMA.properties));
+  assert.deepEqual(DEVICE_READING_SCHEMA.required, READING_SCHEMA.required);
+  assert.equal(DEVICE_READING_SCHEMA.additionalProperties, false);
+  // ...with every value bounded: fixed words, at most two listed numbers.
+  for (const [name, field] of Object.entries(DEVICE_READING_SCHEMA.properties)) {
+    if (name === 'reasons') continue;
+    assert.ok(Array.isArray(field.enum), `${name} is one of fixed words`);
+  }
+  const { reasons } = DEVICE_READING_SCHEMA.properties;
+  assert.equal(reasons.maxItems, 2);
+  assert.deepEqual(reasons.items.enum, REASON_NUMBERS);
+  // Every reason a request on the demo has can be picked.
+  for (const [name, result] of Object.entries(R)) {
+    assert.ok(result.reasons.length <= REASON_NUMBERS.length, `${name}: ${result.reasons.length} reasons`);
+  }
+});

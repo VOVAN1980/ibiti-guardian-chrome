@@ -63,6 +63,19 @@ export const READING_SCHEMA = {
   additionalProperties: false,
 };
 
+// The same form as Gemini Nano's response constraint. A whole number of any
+// length is valid JSON, and constrained to "integer" Nano once wrote
+// "reasons": [1, 2301000000…] and never stopped (2026-11-17, a claim on the
+// demo). Listing the numbers it may pick leaves it nothing to run on with.
+export const REASON_NUMBERS = Array.from({ length: 20 }, (_, i) => i + 1);
+export const DEVICE_READING_SCHEMA = {
+  ...READING_SCHEMA,
+  properties: {
+    ...READING_SCHEMA.properties,
+    reasons: { type: 'array', items: { type: 'integer', enum: REASON_NUMBERS }, maxItems: 2 },
+  },
+};
+
 // ── What the analyzer decoded, in the form's terms ─────────────────────────
 
 const sub = (r) => r.subject || {};
