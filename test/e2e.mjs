@@ -635,6 +635,8 @@ for (const [name, answer] of Object.entries(NANO_CASES)) {
       assert.equal(out.nano.length, 1);
       const constraint = JSON.parse(out.nano[0].options).responseConstraint;
       assert.deepEqual(constraint.properties.who_gains.enum, ['another_party', 'you', 'nobody']);
+      // Listed numbers: a whole number of any length could run on forever.
+      assert.deepEqual(constraint.properties.reasons.items.enum.slice(0, 3), [1, 2, 3]);
       assert.ok(!out.nano[0].contents.includes('without asking you again, until you revoke it'), 'not the code’s sentence');
       assert.ok(!out.nano[0].contents.toLowerCase().includes('1111111111111111111111111111111111111111'), 'not the user’s address');
       if (name.startsWith('a right reading') || name.startsWith('words of its own')) {
@@ -969,9 +971,16 @@ await step('Gemini Nano that never answers: after 90 s the window moves on', asy
     await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
     tab = await browser.newPage();
     await tab.evaluateOnNewDocument(() => {
+      // A session that never answers; destroying it is what stops Chrome generating.
+      window.__destroyed = 0;
       self.LanguageModel = {
         availability: async () => 'available',
-        create: async () => ({ prompt: () => new Promise(() => {}), destroy: () => {} }),
+        create: async () => ({
+          prompt: () => new Promise(() => {}),
+          destroy: () => {
+            window.__destroyed += 1;
+          },
+        }),
       };
     });
     tab.goto(first.review.url()).catch(() => {});
@@ -987,9 +996,11 @@ await step('Gemini Nano that never answers: after 90 s the window moves on', asy
       chip: document.getElementById('local-chip').textContent,
       chipTitle: document.getElementById('local-chip').title,
       chipLook: document.getElementById('local-chip').dataset.source,
+      destroyed: window.__destroyed,
     }));
     assert.equal(out.checked, 'withheld');
     assert.equal(out.withheld, 'no answer within 90 seconds');
+    assert.ok(out.destroyed >= 1, 'Gemini Nano’s session is destroyed, so it stops generating');
     assert.equal(out.chip, 'On device · no answer in 90 s', 'the chip does not look like an answer');
     assert.equal(out.chipLook, 'none', 'nor is it coloured like one');
     assert.match(out.chipTitle, /^No answer within 90 seconds\./);

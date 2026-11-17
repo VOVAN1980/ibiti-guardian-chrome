@@ -14,7 +14,7 @@ does the same check in front of your real wallet).
 <a href="https://youtu.be/1xGWgzLbLEM"><img src="docs/video.jpg" alt="Watch the video: IBITI Guardian for Chrome — know what you sign" width="640"></a>
 
 <p>
-  <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval: the sentence and the warnings are written by code; Gemini Nano read the request on the device" width="360">
+  <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval behind a button that said Continue: Gemini Nano, on the device, read the button as an offer to receive something; code shows that it does not match what the request does" width="360">
   &nbsp;
   <img src="docs/review-cloud.png" alt="The optional cloud analysis through Firebase AI Logic: a scam pattern and things to check, picked from fixed lists that code checks" width="360">
 </p>
@@ -168,9 +168,14 @@ reads the request once more, and its answer is checked the same way.
 
 While Gemini reads, the window counts the seconds and says the user can
 decide without it: the facts, the warnings and both buttons are there from
-the start. Gemini Nano usually answers in 15–30 seconds; it has twice not
-answered at all, so after 90 seconds Guardian stops waiting, says *no answer
-in 90 s*, and treats it like an answer that did not pass.
+the start. Gemini Nano usually answers in 15–30 seconds. Under a schema that
+allowed any whole number, it once wrote `"reasons": [1, 2301000000…` and
+never stopped; the form for Gemini Nano now lists the numbers it may pick
+(`DEVICE_READING_SCHEMA`), and the same request then took 29–33 seconds,
+three times out of three. Should Gemini Nano still not answer, after 90
+seconds Guardian stops waiting, says *no answer in 90 s*, treats it like an
+answer that did not pass, and destroys the session: aborting a prompt does
+not stop Chrome generating, destroying the session does.
 
 What this does and does not prove: Gemini cannot put an amount, an address,
 a token, a role or a direction on screen that the decoder did not find, and
@@ -228,7 +233,7 @@ AI). Without it, press **Allow cloud AI as a fallback** once, and Gemini in
 the cloud reads the requests instead for the rest of the visit. The facts, the
 decision and the deeper analysis do not depend on either.
 
-<img src="docs/playground.png" alt="The hosted playground" width="640">
+<img src="docs/playground.png" alt="The playground: a drainer and an ordinary swap side by side, and the strip showing the request stopped by Guardian" width="640">
 
 ## Build the extension
 

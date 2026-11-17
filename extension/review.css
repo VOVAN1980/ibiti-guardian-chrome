@@ -175,11 +175,13 @@ section > h2 {
   border-radius: var(--radius);
 }
 
+/* The title stays on one line; a long status chip goes under it instead. */
 .ai-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
   margin-bottom: 8px;
 }
 
@@ -187,6 +189,7 @@ section > h2 {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  white-space: nowrap;
 }
 
 .ai-title svg {
