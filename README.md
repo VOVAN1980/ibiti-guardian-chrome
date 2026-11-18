@@ -10,9 +10,9 @@ cloud only if you allow it — and then you decide.
 (a simulation with a demo wallet that has no keys and no funds; the extension
 does the same check in front of your real wallet).
 
-**Video (2:54):** https://youtu.be/1xGWgzLbLEM · **Devpost:** https://devpost.com/software/ibiti-guardian-for-chrome-know-what-you-sign
+**Video (2:23):** https://youtu.be/ruqmaL30ZmU · **Devpost:** https://devpost.com/software/ibiti-guardian-for-chrome-know-what-you-sign
 
-<a href="https://youtu.be/1xGWgzLbLEM"><img src="docs/video.jpg" alt="Watch the video: IBITI Guardian for Chrome — know what you sign" width="640"></a>
+<a href="https://youtu.be/ruqmaL30ZmU"><img src="docs/video.jpg" alt="Watch the video: IBITI Guardian for Chrome — know what you sign" width="640"></a>
 
 <p>
   <img src="docs/review-on-device.png" alt="Guardian holding an unlimited approval behind a button that said Continue: Gemini Nano, on the device, read the button as an offer to receive something; code shows that it does not match what the request does" width="360">
