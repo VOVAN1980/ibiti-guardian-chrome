@@ -35,7 +35,22 @@ const SCENARIOS = {
     params: [
       ME,
       JSON.stringify({
-        types: {},
+        // The standard EIP-2612 types, as a real site sends them.
+        types: {
+          EIP712Domain: [
+            { name: 'name', type: 'string' },
+            { name: 'version', type: 'string' },
+            { name: 'chainId', type: 'uint256' },
+            { name: 'verifyingContract', type: 'address' },
+          ],
+          Permit: [
+            { name: 'owner', type: 'address' },
+            { name: 'spender', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'deadline', type: 'uint256' },
+          ],
+        },
         primaryType: 'Permit',
         domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: USDC },
         message: {
@@ -161,6 +176,11 @@ function renderWallets() {
     simText.replaceChildren(...SIM_TEXT.map((node) => node.cloneNode(true)));
     document.title = 'IBITI Guardian playground';
   }
+
+  // A real wallet is used here only on a test network, where Guardian knows
+  // no token: it asks to check the revoke there. No promise of calm then.
+  document.getElementById('calm-title').textContent =
+    current && !isDemo(current) ? 'Ordinary requests' : 'Ordinary requests: Guardian stays calm';
 
   // The demo wallet needs no connecting and has no networks to switch.
   document.getElementById('connect').hidden = isDemo(current);

@@ -45,6 +45,23 @@ for (const [name, result] of Object.entries(cases)) {
   });
 }
 
+test('the risk level of a payment measured against the balance stays on this computer, whatever the share', () => {
+  // 0.01 ETH of 2 ETH (no red flags), 1 ETH of 100 ETH (a check), 1 ETH of 2 ETH (a check, "about 50%").
+  for (const [value, balance] of [
+    ['0x2386f26fc10000', '0x1bc16d674ec80000'],
+    ['0xde0b6b3a7640000', '0x56bc75e2d63100000'],
+    ['0xde0b6b3a7640000', '0x1bc16d674ec80000'],
+  ]) {
+    const result = analyze({ ...tx(OTHER, '0x', value), enrich: { balance } });
+    assert.match(readingPrompt(result, 'shop.example'), /^Assessment /m, 'on the device it is said');
+    for (const prompt of [readingPrompt(result, 'shop.example', { cloud: true }), deepPrompt(result, 'shop.example')]) {
+      assert.doesNotMatch(prompt, /^Assessment /m, `${value} of ${balance}`);
+    }
+  }
+  // No balance read: the level says nothing about it.
+  assert.match(readingPrompt(analyze(tx(OTHER, '0x', '0x2386f26fc10000')), 'shop.example', { cloud: true }), /^Assessment .*no red flags found$/m);
+});
+
 test('an approval keeps all its reasons in the cloud prompt', () => {
   const result = analyze(tx(USDT, `0x095ea7b3${pad(OTHER)}${uint((1n << 256n) - 1n)}`));
   const cloud = readingPrompt(result, 'shop.example', { cloud: true });
@@ -118,4 +135,112 @@ test('the user’s own address is found in every kind of request and scrubbed', 
   for (const record of Object.values(DEMO_RECORDS)) {
     for (const prompt of cloudPrompts(record)) assert.ok(!prompt.toLowerCase().includes(DEMO_ME.slice(2)), prompt);
   }
+});
+
+// ── Security review of 2026-11-21 ──────────────────────────────────────────
+
+test('F4 / F5: an account only the page reported is hidden, but never called "your own wallet"', async () => {
+  const { meaning } = await import('../src/ai/prompt.js');
+  // The page lists the attacker among the wallet's accounts and asks to pay it.
+  const record = {
+    method: 'eth_sendTransaction',
+    params: [{ from: ME, to: OTHER, value: '0xde0b6b3a7640000' }],
+    chainId: 1,
+    enrich: { accounts: [ME, OTHER], balance: `0x${'f'.repeat(64)}` },
+  };
+  const own = ownAddresses(record);
+  assert.deepEqual(own, [ME, { address: OTHER, reported: true }], 'the sender first, as the user’s own');
+  const result = analyze(record);
+  assert.doesNotMatch(meaning(result, 'shop.example'), /same wallet/);
+  for (const prompt of [...cloudPrompts(record), scrubAddresses(readingPrompt(scrubResult(result, own), 'shop.example'), own)]) {
+    assert.ok(!prompt.toLowerCase().includes(OTHER.slice(2)), 'still kept out of the prompt');
+    assert.match(prompt, /To: \(a hidden address\)/);
+    assert.doesNotMatch(prompt, /To: \(your own wallet\)/);
+  }
+  // The account that sends the request is the user's own.
+  assert.equal(scrubAddresses(`from ${ME}`, own), 'from (your own wallet)');
+  // A payment to that same account is still one to this wallet.
+  assert.match(meaning(analyze({ ...record, params: [{ from: ME, to: ME, value: '0x1' }] }), 'shop.example'), /an address of this same wallet\.$/);
+});
+
+test('the sentence on what confirming does, for the requests the security review added', async () => {
+  const { meaning } = await import('../src/ai/prompt.js');
+  const NFT = '0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D';
+  const itemZero = analyze({ ...tx(NFT, `0x095ea7b3${pad(OTHER)}${uint(0)}`), enrich: { token: { symbol: 'UNI', decimals: 18 } } });
+  assert.equal(
+    meaning(itemZero, 'shop.example'),
+    'If you confirm and this contract is a token, the spending permission for "UNI" is set to zero; if it is an NFT collection, an unknown address can take your item #0.',
+  );
+  assert.doesNotMatch(meaning(itemZero, 'shop.example'), /Nothing leaves your wallet/);
+  const signIn = analyze({
+    method: 'personal_sign',
+    params: [`0x${Buffer.from(`app.uniswap.org wants you to sign in with your Ethereum account:\n${ME}`).toString('hex')}`, ME],
+    origin: 'null',
+  });
+  assert.equal(meaning(signIn, 'null'), 'If you confirm, you sign in to "app.uniswap.org". Guardian cannot tell which site is asking.');
+  const later = analyze({ ...tx(OTHER, '0x', '0x1'), method: 'eth_signTransaction' });
+  assert.match(meaning(later, 'shop.example'), /You only sign it now: the site can send it whenever it chooses\.$/);
+  const delegate = analyze({ method: 'eth_sendTransaction', params: [{ from: ME, to: ME, authorizationList: [{ address: OTHER }] }] });
+  assert.match(meaning(delegate, 'shop.example'), /contract code gets control of your account/);
+  const malformed = analyze(tx(USDT, `095ea7b3${pad(OTHER)}${'f'.repeat(64)}`));
+  assert.match(meaning(malformed, 'shop.example'), /Guardian cannot read/);
+  const bulk = analyze({ method: 'eth_signTypedData_v4', params: [ME, JSON.stringify({ primaryType: 'BulkOrder', domain: {}, message: {} })] });
+  assert.match(meaning(bulk, 'shop.example'), /several marketplace orders at once/);
+});
+
+test('the sentence on what confirming does, for the requests the re-attack added', async () => {
+  const { meaning } = await import('../src/ai/prompt.js');
+  const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+  const signed = (types, primaryType, domain, message) => analyze({ method: 'eth_signTypedData_v4', params: [ME, JSON.stringify({ types, primaryType, domain, message })], chainId: 1 });
+  // increaseAllowance of 0: nothing is removed.
+  const none = analyze(tx(USDT, `0x39509351${pad(OTHER)}${uint(0)}`));
+  assert.equal(meaning(none, 'shop.example'), 'If you confirm, no permission changes: the spender can still move whatever it could before. Nothing is removed.');
+  // An EIP-3009 signed transfer.
+  const fields = 'address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce'.split(',').map((f) => ({ type: f.split(' ')[0], name: f.split(' ')[1] }));
+  const message = { from: ME, to: OTHER, value: '5000000', validAfter: 0, validBefore: 1900000000, nonce: `0x${'ab'.repeat(32)}` };
+  const domain = { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: USDC };
+  const transfer = signed({ TransferWithAuthorization: fields }, 'TransferWithAuthorization', domain, message);
+  assert.equal(meaning(transfer, 'shop.example'), `If you sign, 5 USDC can be moved out of your wallet to ${OTHER}, once, by whoever holds this signature, until the signature expires.`);
+  const receive = signed({ ReceiveWithAuthorization: fields }, 'ReceiveWithAuthorization', domain, message);
+  assert.match(meaning(receive, 'shop.example'), /, once, by the recipient, until the signature expires\.$/);
+  // A meta-transaction: the call it has the contract make, signed now.
+  const meta = { MetaTransaction: [{ name: 'nonce', type: 'uint256' }, { name: 'from', type: 'address' }, { name: 'functionSignature', type: 'bytes' }] };
+  const approve = signed(meta, 'MetaTransaction', { name: 'USDT', verifyingContract: USDT }, { nonce: 0, from: ME, functionSignature: `0x095ea7b3${pad(OTHER)}${'f'.repeat(64)}` });
+  assert.match(meaning(approve, 'shop.example'), /^If you confirm, an unknown address can take any amount of USDT from your wallet, .* You only sign it now: whoever holds the signature can have the contract do this for you, at any time\.$/);
+  // Celo: the network fee in a token.
+  const CUSD = '0x765de816845861e75a25fca122bb6898b8b1282a';
+  const celo = analyze({ method: 'eth_sendTransaction', params: [{ from: ME, to: OTHER, value: '0x1', feeCurrency: CUSD, type: '0x7b' }], chainId: 42220 });
+  assert.match(meaning(celo, 'shop.example'), new RegExp(`goes to ${OTHER}\\. The network fee is paid in the token ${CUSD}\\.$`));
+});
+
+test('the sentence on what confirming does, and the prompt, for the requests the second re-attack added', async () => {
+  const { meaning } = await import('../src/ai/prompt.js');
+  const { typedData } = await import('./demo-records.js');
+  // An NFT permit (Uniswap V3 positions): the item, the collection and the spender, never "up to unknown".
+  const NPM = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88';
+  const domain = { name: 'Uniswap V3 Positions NFT-V1', version: '1', chainId: 1, verifyingContract: NPM };
+  const record = {
+    method: 'eth_signTypedData_v4',
+    params: [ME, JSON.stringify(typedData('Permit', domain, { spender: OTHER, tokenId: '12345', nonce: 0, deadline: 1900000000 }, 'NftPermit'))],
+    chainId: 1,
+  };
+  const item = analyze(record);
+  assert.equal(
+    meaning(item, 'app.uniswap.org'),
+    `If you confirm, an unknown address can take your item #12345 of the collection ${NPM.toLowerCase()} from your wallet, whenever it wants, without asking you, until you revoke it.`,
+  );
+  for (const prompt of [readingPrompt(item, 'app.uniswap.org'), ...cloudPrompts(record)]) {
+    assert.match(prompt, /^Request: Permission for item #12345$/m);
+    assert.match(prompt, /^- Item: #12345$/m);
+    assert.match(prompt, new RegExp(`^- Collection: ${NPM.toLowerCase()}$`, 'm'));
+    assert.doesNotMatch(prompt, /unknown token|up to unknown/i);
+    assert.ok(!prompt.toLowerCase().includes(ME.slice(2)), 'the user’s address is not sent');
+  }
+  // A batch of payments: the sum of the coins, in the sentence and among the facts.
+  const calls = (n) => ({ method: 'wallet_sendCalls', params: [{ chainId: '0x1', from: ME, calls: Array.from({ length: n }, () => ({ to: OTHER, value: '0xb1a2bc2ec50000' })) }], chainId: 1 });
+  const paid = analyze(calls(20));
+  assert.equal(meaning(paid, 'shop.example'), 'If you confirm, all 20 actions listed below are carried out with this one confirmation. Together, they send 1 ETH out of your wallet.');
+  assert.match(readingPrompt(paid, 'shop.example', { cloud: true }), /^- Sends in total: 1 ETH$/m);
+  assert.match(readingPrompt(paid, 'shop.example', { cloud: true }), /^Assessment .*needs a careful look$/m);
+  assert.equal(meaning(analyze(calls(1)), 'shop.example'), 'If you confirm, the action listed below is carried out with this one confirmation.');
 });

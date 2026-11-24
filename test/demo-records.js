@@ -21,6 +21,51 @@ const send = (to, data, value, enrich) => ({
   ...(enrich ? { enrich } : {}),
 });
 
+// The standard EIP-712 types of each permit, as a wallet needs them to sign
+// (and as the analyzer reads a permit: only through them).
+const fields = (spec) =>
+  spec.split(',').map((f) => {
+    const [type, name] = f.split(' ');
+    return { name, type };
+  });
+const DETAILS = fields('address token,uint160 amount,uint48 expiration,uint48 nonce');
+const TOKEN_PERMISSIONS = fields('address token,uint256 amount');
+const TAKE = 'permitted,address spender,uint256 nonce,uint256 deadline';
+export const PERMIT_TYPES = {
+  Permit: { Permit: fields('address owner,address spender,uint256 value,uint256 nonce,uint256 deadline') },
+  DaiPermit: { Permit: fields('address holder,address spender,uint256 nonce,uint256 expiry,bool allowed') },
+  // EIP-4494: one item of an NFT collection (Uniswap V3 positions).
+  NftPermit: { Permit: fields('address spender,uint256 tokenId,uint256 nonce,uint256 deadline') },
+  PermitSingle: { PermitSingle: fields('PermitDetails details,address spender,uint256 sigDeadline'), PermitDetails: DETAILS },
+  PermitBatch: { PermitBatch: fields('PermitDetails[] details,address spender,uint256 sigDeadline'), PermitDetails: DETAILS },
+  PermitTransferFrom: { PermitTransferFrom: fields(`TokenPermissions ${TAKE}`), TokenPermissions: TOKEN_PERMISSIONS },
+  PermitBatchTransferFrom: { PermitBatchTransferFrom: fields(`TokenPermissions[] ${TAKE}`), TokenPermissions: TOKEN_PERMISSIONS },
+  PermitWitnessTransferFrom: {
+    PermitWitnessTransferFrom: fields(`TokenPermissions ${TAKE},Witness witness`),
+    TokenPermissions: TOKEN_PERMISSIONS,
+    Witness: [],
+  },
+};
+const DOMAIN_TYPES = { name: 'string', version: 'string', chainId: 'uint256', verifyingContract: 'address' };
+
+/**
+ * Typed data as a dapp sends it: the standard types of its primary type (or
+ * of `form`, e.g. 'DaiPermit'), and an EIP712Domain for the domain it has.
+ */
+export function typedData(primaryType, domain, message, form = primaryType) {
+  return {
+    types: {
+      EIP712Domain: Object.keys(domain)
+        .filter((name) => name in DOMAIN_TYPES)
+        .map((name) => ({ name, type: DOMAIN_TYPES[name] })),
+      ...PERMIT_TYPES[form],
+    },
+    primaryType,
+    domain,
+    message,
+  };
+}
+
 export const DEMO_RECORDS = {
   claim: send(USDT, `0x095ea7b3${pad(ATTACKER)}${MAX}`, null, { spenderIsContract: false }),
   fake: send(FAKE_USDT, `0x095ea7b3${pad(ATTACKER)}${uint(1000000n)}`, null, {
@@ -37,12 +82,13 @@ export const DEMO_RECORDS = {
     method: 'eth_signTypedData_v4',
     params: [
       ME,
-      JSON.stringify({
-        types: {},
-        primaryType: 'Permit',
-        domain: { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: USDC },
-        message: { owner: ME, spender: ATTACKER, value: BigInt(`0x${MAX}`).toString(), nonce: 0, deadline: 4102444800 },
-      }),
+      JSON.stringify(
+        typedData(
+          'Permit',
+          { name: 'USD Coin', version: '2', chainId: 1, verifyingContract: USDC },
+          { owner: ME, spender: ATTACKER, value: BigInt(`0x${MAX}`).toString(), nonce: 0, deadline: 4102444800 },
+        ),
+      ),
     ],
     enrich: { spenderIsContract: false },
   },

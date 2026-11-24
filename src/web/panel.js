@@ -9,15 +9,25 @@
 // removed by that page. The extension's window is outside the page's reach.
 
 (() => {
-  if (window.__ibitiGuardian) return; // the extension is here and does the real thing
+  // The extension is here and does the real thing: its in-page guard marks
+  // the document before any script of the page runs.
+  if (Object.prototype.hasOwnProperty.call(document, Symbol.for('ibiti.guardian'))) return;
 
   const base = document.currentScript ? document.currentScript.src : location.href;
   const uuid = () =>
     crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
   const channel = `ig-${uuid()}`;
-  document.documentElement.setAttribute('data-ibiti-guardian', channel);
   window.__ibitiGuardianPreview = true;
+
+  // The in-page guard (loaded just after this script) asks for the channel
+  // name as it starts; it gets it the way the extension's bridge gives it:
+  // once, in the detail of a 'hello' event.
+  const asked = () => {
+    document.removeEventListener('ibiti-guardian:ask', asked);
+    document.dispatchEvent(new CustomEvent('ibiti-guardian:hello', { detail: channel, cancelable: true }));
+  };
+  document.addEventListener('ibiti-guardian:ask', asked);
 
   const queue = [];
   let open = null; // { id, pageId, root, frame }
@@ -29,6 +39,8 @@
     } catch {
       return;
     }
+    // Taken: the in-page guard refuses at once a request no one takes.
+    event.preventDefault();
     queue.push(payload);
     next();
   });

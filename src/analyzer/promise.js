@@ -11,8 +11,10 @@
 // a button that offers to receive something, to sign in, or to remove a
 // permission, on a request that moves the user's assets out or grants a
 // permission (a sign-in or a revoke also on coins sent to a contract call
-// Guardian cannot read); or a mint, swap, payment or stake that asks for every
-// item in a collection.
+// Guardian cannot read or to a new contract, and a revoke on a request that
+// removes no permission); or a mint, swap, payment or stake that asks for
+// every item in a collection. approve(spender, 0) on a contract that may be
+// an NFT collection is a revoke or a permission for item #0: a revoke fits it.
 
 // The offers code can read from a button's words. A button may name more
 // than one ("Approve and claim"): all of them count, and only a button whose
@@ -63,6 +65,11 @@ const clean = (value) =>
   typeof value === 'string'
     ? value
         .slice(0, 2000)
+        // Letters drawn another way (full-width, ligatures) as the plain
+        // ones, and no invisible characters (zero-width, soft hyphen,
+        // direction marks): they could split a word code reads, or an address.
+        .normalize('NFKC')
+        .replace(/\p{Cf}/gu, '')
         .replace(ADDRESS, 'an address')
         .replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ')
         .replace(/\s+/g, ' ')
@@ -84,9 +91,30 @@ export function cleanPromise(raw) {
   return { button, title: clean(raw.title), heading: clean(raw.heading), ageMs: Math.round(ageMs) };
 }
 
+// Cyrillic and Greek letters that look like Latin ones ("Clаim" with a
+// Cyrillic а), each followed by the Latin letter it imitates.
+const LOOKALIKES =
+  'аaвbеeёeкkмmнhоoрpсcтtуyхxіiїiјjѕsԁdӏlһhԛqԝwАaВbЕeКkМmНhОoРpСcТtУyХxІiЈjЅsԀdӀlҺhԚqԜwαaιiκkνvοoρpτtυuχxεeΑaΒbΕeΗhΙiΚkΜmΝnΟoΡpΤtΥyΧxΖz';
+const LOOKALIKE = new Map(Array.from({ length: LOOKALIKES.length / 2 }, (_, i) => [LOOKALIKES[2 * i], LOOKALIKES[2 * i + 1]]));
+
+/**
+ * A button's words as code reads them: lookalike letters as the Latin ones
+ * they imitate, but only where they imitate Latin (in a word that mixes them
+ * with Latin letters, or in a button with no other non-Latin letters), so
+ * "Получить бонус" stays as it is.
+ */
+function readable(button) {
+  const text = String(button);
+  const otherScript = Array.from(text).some((ch) => /\p{L}/u.test(ch) && !/\p{Script=Latin}/u.test(ch) && !LOOKALIKE.has(ch));
+  return text.replace(/\p{L}+/gu, (word) => {
+    const mixed = /\p{Script=Latin}/u.test(word) && Array.from(word).some((ch) => LOOKALIKE.has(ch));
+    return mixed || !otherScript ? Array.from(word, (ch) => LOOKALIKE.get(ch) || ch).join('') : word;
+  });
+}
+
 /** Every offer code reads in a button's words, in the list's order. */
 export function offersOf(button) {
-  const text = String(button);
+  const text = readable(button);
   return Object.entries(OFFERS)
     .filter(([, offer]) => offer.words.test(text))
     .map(([kind]) => kind);
@@ -100,21 +128,42 @@ export function offerOf(button) {
 const sub = (r) => r.subject || {};
 const partsOf = (r) => (r.kind === 'batch' ? r.parts || [] : [r]);
 const GRANTS = new Set(['approve', 'permitTransfer', 'permit2Batch', 'approveAll']);
+// approve(spender, 0) on a contract that may be an NFT collection: a revoke,
+// or a permission for item #0 (src/analyzer/index.js). An offer to revoke
+// fits it; an offer to receive something or to sign in does not.
+const maybeRevoke = (p) => Boolean(sub(p).itemZero);
 
-/** Whether the request moves the user's assets out, now or through a permission. */
-function takesOut(r) {
+/**
+ * Whether the request moves the user's assets out, now or through a
+ * permission. `revoking`: against an offer to revoke, where a part that may
+ * be a revoke does not count (unless it sends coins).
+ */
+function takesOut(r, { revoking = false } = {}) {
   return partsOf(r).some((p) => {
     const s = sub(p);
     if (s.coins) return true;
+    if (revoking && maybeRevoke(p)) return false;
     if (GRANTS.has(s.action) || s.action === 'marketOrder') return true;
     if ((s.action === 'transfer' || s.action === 'nativeTransfer') && !s.empty && s.fromSelf !== false) return true;
     return false;
   });
 }
 
-/** Whether the request sends coins to a contract call Guardian cannot read. */
+/**
+ * Whether the request removes no permission while it touches one: an
+ * increaseAllowance of 0 adds nothing, and a fake revoke page may send it.
+ */
+function removesNothing(r) {
+  const parts = partsOf(r);
+  return (
+    parts.some((p) => sub(p).action === 'noChange') &&
+    !parts.some((p) => ['revoke', 'revokeAll'].includes(sub(p).action) || maybeRevoke(p))
+  );
+}
+
+/** Whether the request sends coins to a contract call Guardian cannot read, or to a new contract. */
 function paysUnknownCall(r) {
-  return partsOf(r).some((p) => sub(p).action === 'contractCall' && Boolean(sub(p).sends));
+  return partsOf(r).some((p) => ['contractCall', 'deploy'].includes(sub(p).action) && Boolean(sub(p).sends));
 }
 
 /** Whether the request is a permission or a marketplace order. */
@@ -130,10 +179,17 @@ export function whatItDoes(r) {
   switch (s.action) {
     case 'contractCall':
       return s.sends ? `sends ${s.sends} to a contract call Guardian cannot read` : 'calls a contract Guardian cannot read';
+    case 'deploy':
+      return s.sends ? `sends ${s.sends} to a new contract it creates` : 'creates a new contract';
     case 'approve':
+      if (s.itemZero) return 'may give someone your item #0, if this contract is an NFT collection';
+      // An NFT permit: one item of a collection.
+      if (s.item) return `gives someone permission to take your item #${s.item} out of your wallet`;
       return s.unlimited
         ? `gives someone permission to take any amount of ${symbol} out of your wallet`
         : `gives someone permission to take ${symbol} out of your wallet`;
+    case 'noChange':
+      return 'removes no permission';
     case 'permitTransfer':
     case 'permit2Batch':
       return 'lets someone take tokens out of your wallet';
@@ -141,11 +197,13 @@ export function whatItDoes(r) {
       return 'gives someone access to every item you own in a collection';
     case 'transfer':
     case 'nativeTransfer':
-      return `sends ${s.amount} out of your wallet`;
+      return s.authorization ? `lets someone move ${s.amount} out of your wallet` : `sends ${s.amount} out of your wallet`;
     case 'marketOrder':
       return 'signs a marketplace order for your items';
     case 'batch':
-      return 'carries out several actions, including one that moves assets out of your wallet';
+      return takesOut(r) || !removesNothing(r)
+        ? 'carries out several actions, including one that moves assets out of your wallet'
+        : 'carries out several actions, none of which removes a permission';
     default:
       return 'does something else';
   }
@@ -154,12 +212,15 @@ export function whatItDoes(r) {
 /** Whether one offer contradicts the decoded request. */
 function clashes(offer, result) {
   const out = takesOut(result);
-  const grants = partsOf(result).some((p) => GRANTS.has(sub(p).action));
   const collection = partsOf(result).some((p) => sub(p).action === 'approveAll');
   // A claim may cost a fee to a contract; a sign-in or a revoke never sends coins.
   if (offer === 'receive') return out;
   if (offer === 'sign_in') return out || paysUnknownCall(result);
-  if (offer === 'revoke') return out || grants || paysUnknownCall(result);
+  if (offer === 'revoke') {
+    // Revoking is one of the two readings of approve(spender, 0): only the
+    // other parts count. A request that removes nothing is no revoke either.
+    return takesOut(result, { revoking: true }) || paysUnknownCall(result) || removesNothing(result);
+  }
   if (['mint', 'swap', 'pay', 'stake'].includes(offer)) return collection;
   return false;
 }
@@ -187,11 +248,12 @@ export function contradiction(offers, result, button) {
  */
 export function readButton(button, result) {
   let offers = offersOf(button);
-  if (offers.length === 0 && MAYBE_PAID.test(button)) {
+  const words = readable(button);
+  if (offers.length === 0 && MAYBE_PAID.test(words)) {
     if (!partsOf(result).some((p) => sub(p).action === 'marketOrder')) return { offers, offer: null, clash: null };
     offers = ['receive'];
   }
-  if (offers.includes('approve') && !STRONG_APPROVE.test(button) && !grantsOrLists(result)) {
+  if (offers.includes('approve') && !STRONG_APPROVE.test(words) && !grantsOrLists(result)) {
     return { offers, offer: null, clash: null };
   }
   return { offers, offer: offers[0] || null, clash: contradiction(offers, result, button) };

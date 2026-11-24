@@ -35,7 +35,7 @@
   "method": "eth_signTypedData_v4",
   "params": [
    "0x6666666666666666666666666666666666666666",
-   "{\"types\":{},\"primaryType\":\"PermitSingle\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"details\":{\"token\":\"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\",\"amount\":\"300000000\",\"expiration\":1796601600,\"nonce\":3},\"spender\":\"0x111111125421cA6dc452d289314280a0f8842A65\",\"sigDeadline\":1796601600}}"
+   "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"},{\"name\":\"verifyingContract\",\"type\":\"address\"}],\"PermitSingle\":[{\"name\":\"details\",\"type\":\"PermitDetails\"},{\"name\":\"spender\",\"type\":\"address\"},{\"name\":\"sigDeadline\",\"type\":\"uint256\"}],\"PermitDetails\":[{\"name\":\"token\",\"type\":\"address\"},{\"name\":\"amount\",\"type\":\"uint160\"},{\"name\":\"expiration\",\"type\":\"uint48\"},{\"name\":\"nonce\",\"type\":\"uint48\"}]},\"primaryType\":\"PermitSingle\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"details\":{\"token\":\"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\",\"amount\":\"300000000\",\"expiration\":1796601600,\"nonce\":3},\"spender\":\"0x111111125421cA6dc452d289314280a0f8842A65\",\"sigDeadline\":1796601600}}"
   ]
  },
  "oneTimeTake": {
@@ -44,7 +44,7 @@
   "method": "eth_signTypedData_v4",
   "params": [
    "0x6666666666666666666666666666666666666666",
-   "{\"types\":{},\"primaryType\":\"PermitTransferFrom\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"permitted\":{\"token\":\"0xdAC17F958D2ee523a2206206994597C13D831ec7\",\"amount\":\"1000000000\"},\"spender\":\"0xb81C5e2D7a0F94c3E6B2d18A5f0c7E9D3a4B6c21\",\"nonce\":7,\"deadline\":4102444800}}"
+   "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"},{\"name\":\"verifyingContract\",\"type\":\"address\"}],\"PermitTransferFrom\":[{\"name\":\"permitted\",\"type\":\"TokenPermissions\"},{\"name\":\"spender\",\"type\":\"address\"},{\"name\":\"nonce\",\"type\":\"uint256\"},{\"name\":\"deadline\",\"type\":\"uint256\"}],\"TokenPermissions\":[{\"name\":\"token\",\"type\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\"}]},\"primaryType\":\"PermitTransferFrom\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"permitted\":{\"token\":\"0xdAC17F958D2ee523a2206206994597C13D831ec7\",\"amount\":\"1000000000\"},\"spender\":\"0xb81C5e2D7a0F94c3E6B2d18A5f0c7E9D3a4B6c21\",\"nonce\":7,\"deadline\":4102444800}}"
   ],
   "enrich": {
    "spenderIsContract": false
@@ -56,7 +56,7 @@
   "method": "eth_signTypedData_v4",
   "params": [
    "0x6666666666666666666666666666666666666666",
-   "{\"types\":{},\"primaryType\":\"PermitBatchTransferFrom\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"permitted\":[{\"token\":\"0x6B175474E89094C44Da98b954EedeAC495271d0F\",\"amount\":\"115792089237316195423570985008687907853269984665640564039457584007913129639935\"},{\"token\":\"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\",\"amount\":\"50000000\"}],\"spender\":\"0x2E9d8C7b6A5f4E3d2C1b0A9f8E7d6C5b4A3f2E1d\",\"nonce\":8,\"deadline\":4102444800}}"
+   "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"},{\"name\":\"verifyingContract\",\"type\":\"address\"}],\"PermitBatchTransferFrom\":[{\"name\":\"permitted\",\"type\":\"TokenPermissions[]\"},{\"name\":\"spender\",\"type\":\"address\"},{\"name\":\"nonce\",\"type\":\"uint256\"},{\"name\":\"deadline\",\"type\":\"uint256\"}],\"TokenPermissions\":[{\"name\":\"token\",\"type\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\"}]},\"primaryType\":\"PermitBatchTransferFrom\",\"domain\":{\"name\":\"Permit2\",\"chainId\":1,\"verifyingContract\":\"0x000000000022D473030F116dDEE9F6B43aC78BA3\"},\"message\":{\"permitted\":[{\"token\":\"0x6B175474E89094C44Da98b954EedeAC495271d0F\",\"amount\":\"115792089237316195423570985008687907853269984665640564039457584007913129639935\"},{\"token\":\"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\",\"amount\":\"50000000\"}],\"spender\":\"0x2E9d8C7b6A5f4E3d2C1b0A9f8E7d6C5b4A3f2E1d\",\"nonce\":8,\"deadline\":4102444800}}"
   ]
  },
  "approveWithCoins": {

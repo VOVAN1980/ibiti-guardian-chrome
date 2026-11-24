@@ -24,10 +24,13 @@ Built for #BuildHybridAI 2026.
 
 ## What it does
 
-1. **Holds the request.** When a page asks the wallet to sign or send
-   (`eth_sendTransaction`, `eth_signTypedData_v4`, `personal_sign`, `eth_sign`,
-   `wallet_sendCalls`), Guardian holds it and opens its own window. The wallet
-   has not seen the request yet.
+1. **Holds the request.** When a page asks the wallet to sign, send or grant
+   something (`eth_sendTransaction`, `eth_signTransaction`, `eth_signTypedData`
+   with its `_v1`, `_v3` and `_v4`, `personal_sign`, `eth_sign`, `wallet_sign`,
+   `wallet_sendCalls`, `wallet_sendPreparedCalls`, `wallet_grantPermissions`,
+   `wallet_requestExecutionPermissions`, and the snap and keyring calls
+   `wallet_invokeSnap`, `wallet_snap` and `wallet_invokeKeyring`), Guardian
+   holds it and opens its own window. The wallet has not seen the request yet.
 2. **Facts first, from code.** A deterministic analyzer decodes it: what
    action, which token (and whether its contract is the real one on that
    network), how much, to whom, on which network, and why it matters. The risk
@@ -46,14 +49,35 @@ Built for #BuildHybridAI 2026.
    structured second opinion: the scam pattern it matches and what to verify, picked
    from fixed lists that code checks against the request.
 5. **You decide.** *Reject* returns the standard error 4001 to the site and
-   the wallet never sees the request. *Continue* forwards exactly the request
-   that was reviewed.
+   the wallet never sees the request. *Continue* forwards the request that
+   was reviewed, unchanged; if the page has meanwhile changed what the
+   wallet's copy of it would inherit, it is refused instead. It comes alive a
+   moment after the window appears and is in focus, and then counts a click,
+   Enter or Space only after a short pause in clicking and key presses, so a
+   double-click or a fast run of clicks or keys meant for the page does not
+   land on it; a press it does not count, it says so (*Press it again to
+   confirm*). A second window from the same tab opens exactly over the
+   first, so its buttons sit where the first one's are; a window from a tab
+   in another browser window opens by that window.
 
-It recognises unlimited approvals, gasless permit signatures (EIP-2612 and
-Permit2), NFT `setApprovalForAll`, blind `eth_sign`, fake tokens that borrow a
-famous symbol, sign-in messages for a different site, transfers measured
-against your balance, marketplace orders and batched calls — and it stays calm
-on ordinary requests.
+It recognises unlimited approvals (an amount counts as unlimited from a
+trillion tokens of a token Guardian knows, or a quadrillion of any other),
+gasless permit signatures (EIP-2612, Permit2, and an NFT permit, read as
+permission to take that one item), NFT
+`setApprovalForAll`, account delegations (EIP-7702; it names every contract
+the account would be handed to), blind `eth_sign`, `personal_sign` messages
+read as the wallet signs them (hex written without `0x`, or with `0X`, is
+read both ways and gets at least *Check carefully*), fake tokens that borrow
+a famous symbol, sign-in messages for a different site, transfers that would
+take almost all of your balance, marketplace orders, signed token transfers
+(EIP-3009), meta-transactions and batched calls — and it stays calm on
+ordinary requests such as a sign-in or a single small payment on a network
+it knows (up to 0.05 of its coin). A larger payment, a payment on a network
+Guardian does not know or cannot tell, a batch that sends coins in more
+than one call or more than 0.05 in all, a token transfer, and a network fee
+the site sets itself above 0.05 of the coin get at least *Check carefully*:
+Guardian learns your balance from the page, so the balance can only raise
+the risk, never lower it.
 
 ## What the button said, and what the request does
 
@@ -72,7 +96,9 @@ shortened, are taken out before anything is cut short, shown or sent.
   what the request really does. Only a clear contradiction is a warning: a button that
   offers to receive something, to sign in or to remove a permission, on a
   request that takes assets out or grants a permission (a sign-in or a revoke
-  also on coins sent to a contract call Guardian cannot read); or a mint,
+  also on coins sent to a contract call Guardian cannot read or to a new
+  contract); a revoke on a request that removes no permission
+  (`increaseAllowance` by 0); or a mint,
   swap, payment or stake that asks for every item in a collection. A button
   that names more than one thing counts only if all of them contradict the
   request: *Approve and claim* says it approves, so on a permission it is no
@@ -222,7 +248,8 @@ mistakes: the analyzer and the build are tested on their own (`npm test`,
    went: stopped at Guardian, or through to the demo wallet.
 2. Press **Approve 25 USDC for a swap** next to it: an ordinary request, and
    Guardian stays calm. More examples are below: five other things drainers
-   ask for, and three ordinary requests.
+   ask for, and three ordinary requests where it stays calm too (a sign-in, a
+   revoke and a payment of 0.01 ETH).
 3. In **Write the button yourself**, type any words for the button (try
    *Continue* or *Approve and claim*) and choose what it really asks for: see
    when Guardian says the button and the request do not match, and when
@@ -280,8 +307,10 @@ page. It is a preview, not protection: a panel inside a page can be removed by
 that page, which is why the extension opens its own window instead.
 
 The published site only ever uses the demo wallet and says so. It proves
-itself to App Check with reCAPTCHA Enterprise; the App Check debug token is
-never written into the site, and the build fails if it finds it there.
+itself to App Check with reCAPTCHA Enterprise. The App Check debug token
+stays out of what is published: every build, also one that fails, ends by
+searching the folder Firebase publishes for it, and if it is there, deletes
+that folder and fails.
 
 ```bash
 npm run deploy:site                                       # build, test, publish
@@ -293,11 +322,19 @@ node test/cloud-live.mjs                                  # live cloud analysis 
 ## Tests
 
 ```bash
-npm test             # analyzer: decoding and risk rules; what prompts may send to the cloud
+npm test             # analyzer: decoding and risk rules; what prompts may send to the cloud;
+                     # what the build and the local demo server keep private
 npm run test:e2e     # real Chrome: the extension, then the no-install site
 ```
 
-`npm test` also checks Gemini's part (`test/reading.test.js`): every wrong
+`npm test` holds the analyzer to its rules, among them what the page may
+tell it: a balance or the accounts that the page reports can raise the risk
+of a request, never lower it; a single small payment on a network Guardian
+knows raises no flag by itself, but several in one batch do; and a network
+is marked unconfirmed only when the page alone names a test network or one
+Guardian does not know.
+
+It also checks Gemini's part (`test/reading.test.js`): every wrong
 value of every field is caught for every kind of request; every high-risk
 request carries a warning that stays on screen whatever the model picks; real
 Gemini answers recorded live (`test/fixtures/real-forms.json`) get the
@@ -306,8 +343,8 @@ by an author who never saw the checks, stay caught
 (`test/fixtures/forms-set-*.json`).
 
 The end-to-end tests check that a held request does not reach the wallet,
-that Reject returns error 4001, that Continue forwards the request byte for
-byte, that closing the window or losing contact with the extension refuses
+that Reject returns error 4001, that Continue forwards the reviewed request
+unchanged, that closing the window or losing contact with the extension refuses
 the request, and that nothing is sent to the cloud before the user asks.
 With a stand-in for Gemini Nano they check what the window shows for a right
 reading, a reading that picks no warning, a swapped role, a swapped
@@ -315,10 +352,35 @@ direction, an answer with words of its own, and an answer that is not the
 form: the warnings always stay, a wrong reading is never used, and no word
 of the model reaches the screen.
 They also check the unfriendly cases: a wallet that replaces its own
-`request()` after start-up stays guarded (`test/swap.mjs`), and a page cannot
-change a request while it is being reviewed, hide the method behind a getter,
-or slip a transaction through in a batch (`test/tamper.mjs`). `test/site.mjs`
-runs all ten scenarios on the hosted demo, on desktop and phone screens.
+`request()` after start-up stays guarded, a legacy call that passes
+through several of the wallet's methods (`send`, `sendAsync`, `request`) is
+shown once, a wallet that answers with a `Promise` the page replaced (as
+Angular's zone.js does), or whose first `request()` never answered before it
+put another in place, is still read, and a page that wraps the wallet's
+`request()` in a function of its own (a queue, say) keeps working in the
+common forms
+(`test/swap.mjs`); a request made through the provider cannot be
+changed while it is being reviewed, hide its method behind a getter, or carry
+a transaction inside a batch; a page that rewrites itself with
+`document.write()` has its requests reviewed or refused at once, never left
+waiting; and a page cannot preset Guardian's private
+channel in its own markup, switch Guardian off in a page it opens by marking
+that page, add a key that the wallet's copy of the request would inherit, or
+pass its own function off as another Guardian's wrapper (`test/tamper.mjs`).
+`test/review.mjs` checks the window itself: Continue cannot be pressed the
+instant it appears, nor by a fast run of clicks or key presses, a key held
+down, or one Shift+Tab and Enter, and a press it does not count says so
+without moving the buttons; a second window opens exactly over the first,
+never with its Continue where the first one's Reject is, even when the page
+opens a popup placed for that, and a window for a tab in another normal
+browser window opens by that window, never over the open one; a window whose page
+went on to another page still closes on Reject, and the page gets the
+answer when it comes back; a page that goes away and back quickly keeps its
+window; a long message is shown whole; a site with no address of its own is
+never called "null", on screen or in what may be sent; and a request the
+window cannot fully display keeps Continue off.
+`test/site.mjs` runs all ten scenarios on the hosted demo, on desktop and
+phone screens.
 
 By hand, with a real browser wallet on test networks: Reject kept the request
 from the wallet; Continue delivered the same request to it.
@@ -331,7 +393,9 @@ from the wallet; Continue delivered the same request to it.
   reviews and forwards its own copy of the request.
 - `src/bridge.js` and `src/background.js` carry the request to Guardian's own
   window, which the site cannot touch. If that window is closed or the
-  extension cannot be reached, the request is refused, never passed.
+  extension cannot be reached, the request is refused, never passed. A page
+  that went on to another page and comes back (the browser's back/forward
+  cache) gets the answer the user gave meanwhile.
 - `src/analyzer/` decodes the request without AI.
 - `src/review.js` is the review window; `src/host.js` lets the same window run
   in the extension and in the hosted preview (`src/web/panel.js`).
@@ -359,9 +423,48 @@ moved.
 
 ## Limits
 
-Guardian wraps the standard provider API. A site that talks to a wallet
-through a private channel instead is not covered, and the wallet's own
-confirmation remains the last line of defense.
+Guardian runs inside the page, next to the site's own code. It holds the
+requests a site makes through the standard provider API (`request`, `send`,
+`sendAsync`) and refuses those it cannot read. A site written specifically to
+get around Guardian can still reach the wallet without it: through the
+wallet's prototype or internal methods, or through the wallet's own channel
+to its extension. A page that opens or frames another page of its own site
+can prepare that page's JavaScript before Guardian starts there; in that
+page, Guardian can then be made to pass a request without the user's
+decision, even before its window appears. Such a site can also answer
+falsely when Guardian asks the wallet for context: a balance, the wallet's
+accounts, the network or a token's decimals. A balance or accounts reported
+this way can only raise the risk. The network and a token's decimals are
+taken as reported, so a page that lies about them can make a single small
+payment of coins (up to 0.05) look calm, or an amount look smaller than it
+is (a spending permission for 2^128 base units or more is always
+unlimited). A test network or one Guardian does not know, named only by the
+page, is shown as unconfirmed, and decimals a token reports about itself are
+marked unverified. Either way, the wallet's own confirmation remains the
+last line of defense.
+
+Some honest requests always get a closer look. Snap and keyring calls
+(`wallet_invokeSnap`, `wallet_snap`, `wallet_invokeKeyring`) open Guardian's
+window every time, even calls that only read: Guardian cannot tell what a
+snap will do. A transaction with a field Guardian does not know, such as a
+network's own (zkSync's paymaster data), is shown as *Transaction Guardian
+cannot read*. A wallet that rewrites a request and passes it to its own
+`request()` (`eth_signTypedData_v3` as `_v4`, say) shows Guardian's window
+again for the rewritten request. Where Guardian reads no decimals for a
+token it does not know (a Permit2 signature), an amount counts as unlimited
+from 10^30 base units, a trillion of an 18-decimals token, so an exact
+permission for more of a coin such as SHIB is shown as *Unlimited*.
+
+Guardian checks what the wallet's copy of a request would inherit from the
+page. A key the page has added to `Object.prototype` (or an index or
+`toJSON` on `Array.prototype`), there when the request arrives or when
+Continue is clicked, makes Guardian refuse the request. A wallet that runs
+inside the page itself can still be fooled by the page while it handles the
+request, for example through a built-in the page has changed; that way the
+page can also make such a wallet receive a request the user allowed more
+than once (the same request each time), by sending it again from inside the
+wallet's own handling of it. Here too, the wallet's own confirmation remains
+the last line of defense.
 
 ## License
 

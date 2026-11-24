@@ -89,6 +89,18 @@ const tokensOf = (r) => {
 const field = (action, who, direction, limit) => ({ action, who_gains: who, direction, limit });
 const OUT = ['out_of_your_wallet'];
 const OTHER = ['another_party'];
+const FIELDS = ['action', 'who_gains', 'direction', 'limit'];
+const REMOVE = field(['remove_permission'], ['nobody'], ['nothing_moves'], ['does_not_apply', 'limited']);
+
+/**
+ * Two (or more) readings that are each right as a whole, where Guardian
+ * cannot tell which applies. Each field lists the values of all of them,
+ * and `either` keeps them apart: an answer must be one of them in every field.
+ */
+const either = (...readings) => ({
+  ...Object.fromEntries(FIELDS.map((name) => [name, [...new Set(readings.flatMap((r) => r[name]))]])),
+  either: readings,
+});
 
 /**
  * For each field, the values that are right for this request. Null when the
@@ -97,17 +109,24 @@ const OTHER = ['another_party'];
 export function decodedReading(result) {
   if (isUndecoded(result)) return null;
   const reading = readingOf(result);
+  if (!reading || !sub(result).coins) return reading;
   // Coins sent along with a token call leave the wallet, to the contract,
   // whatever the call itself does.
-  if (reading && sub(result).coins) return { ...reading, who_gains: OTHER, direction: OUT };
-  return reading;
+  const paid = (r) => ({ ...r, who_gains: OTHER, direction: OUT });
+  return reading.either ? either(...reading.either.map(paid)) : paid(reading);
 }
 
 function readingOf(result) {
   const s = sub(result);
   switch (s.action) {
     case 'approve':
+      // approve(spender, 0) on a contract that may be an NFT collection: a
+      // revoke, or a permission for item #0. Either reading, whole, is right.
+      if (s.itemZero) return either(REMOVE, field(['spending_permission'], OTHER, OUT, ['limited']));
       return field(['spending_permission'], OTHER, OUT, [s.unlimited ? 'unlimited' : 'limited']);
+    case 'noChange':
+      // increaseAllowance of 0: a spending permission that changes nothing. Never a removal.
+      return field(['spending_permission'], ['nobody'], ['nothing_moves'], ['does_not_apply', 'limited']);
     case 'permitTransfer':
       // One-time: the spender takes the amount once. Either word fits it.
       return field(['spending_permission', 'payment'], OTHER, OUT, [s.unlimited ? 'unlimited' : 'limited']);
@@ -120,28 +139,36 @@ function readingOf(result) {
       return field(['collection_access'], OTHER, OUT, ['unlimited']);
     case 'transfer':
     case 'nativeTransfer': {
-      if (s.empty) return field(['payment'], ['nobody', 'another_party'], ['nothing_moves'], ['does_not_apply', 'limited']);
+      if (s.empty) {
+        // No coins move; a network fee the site set high enough to be said leaves the wallet, though.
+        const moves = s.fee ? ['nothing_moves', 'out_of_your_wallet'] : ['nothing_moves'];
+        return field(['payment'], ['nobody', 'another_party'], moves, ['does_not_apply', 'limited']);
+      }
       const limit = ['limited'];
+      // A transfer signed now and carried out by someone else (EIP-3009): a
+      // payment, or a one-time permission to take the amount. Either word fits.
+      const kinds = s.authorization ? ['payment', 'spending_permission'] : ['payment'];
       if (s.fromSelf === false) {
         // Someone else's tokens, moved with their permission: none of the
         // user's own assets move. The recipient gains them, so either
         // reading of who gains is right; "you" is not, unless they come here.
         return s.toSelf
-          ? field(['payment'], ['you'], ['into_your_wallet'], limit)
-          : field(['payment'], ['nobody', 'another_party'], ['nothing_moves'], limit);
+          ? field(kinds, ['you'], ['into_your_wallet'], limit)
+          : field(kinds, ['nobody', 'another_party'], ['nothing_moves'], limit);
       }
       // To another address of this same wallet.
-      if (s.toSelf) return field(['payment'], ['you'], ['out_of_your_wallet', 'nothing_moves'], limit);
-      return field(['payment'], OTHER, OUT, limit);
+      if (s.toSelf) return field(kinds, ['you'], ['out_of_your_wallet', 'nothing_moves'], limit);
+      return field(kinds, OTHER, OUT, limit);
     }
     case 'revoke':
     case 'revokeAll':
-      return field(['remove_permission'], ['nobody'], ['nothing_moves'], ['does_not_apply', 'limited']);
+      return REMOVE;
     case 'signIn':
-      // A sign-in for a different site: nothing moves, but the other site
-      // could use the signature to sign in as the user. Either reading of
-      // who gains is right there; "you" is not.
-      return field(['sign_in'], s.mismatch ? ['nobody', 'another_party'] : ['nobody'], ['nothing_moves'], ['does_not_apply']);
+      // A sign-in for a different site (or from a site Guardian cannot
+      // identify): nothing moves, but another site could use the signature
+      // to sign in as the user. Either reading of who gains is right there;
+      // "you" is not.
+      return field(['sign_in'], s.mismatch || s.unknownSite ? ['nobody', 'another_party'] : ['nobody'], ['nothing_moves'], ['does_not_apply']);
     case 'signMessage':
       return field(['sign_text'], ['nobody'], ['nothing_moves'], ['does_not_apply']);
     case 'marketOrder':
@@ -149,15 +176,18 @@ function readingOf(result) {
     case 'batch': {
       const parts = (result.parts || []).map(decodedReading);
       if (parts.length === 0 || parts.some((p) => p === null)) return null;
-      const leaves = parts.some((p) => p.direction.includes('out_of_your_wallet'));
+      // Assets leave if some action lets them leave in every reading of it;
+      // if that holds only in one reading, either way of the batch is right.
+      const readings = (p) => p.either || [p];
+      const leaves = (r) => r.direction.includes('out_of_your_wallet');
+      const surely = parts.some((p) => readings(p).every(leaves));
+      const maybe = parts.some((p) => readings(p).some(leaves));
       // Unlimited if any action is; otherwise limited (or, read literally, not a matter of amount).
       const unlimited = parts.some((p) => p.limit.length === 1 && p.limit[0] === 'unlimited');
-      return field(
-        ['several_actions'],
-        leaves ? OTHER : ['nobody'],
-        leaves ? OUT : ['nothing_moves'],
-        unlimited ? ['unlimited'] : ['limited', 'does_not_apply'],
-      );
+      const limit = unlimited ? ['unlimited'] : ['limited', 'does_not_apply'];
+      const out = field(['several_actions'], OTHER, OUT, limit);
+      const stays = field(['several_actions'], ['nobody'], ['nothing_moves'], limit);
+      return surely ? out : maybe ? either(out, stays) : stays;
     }
     default:
       return null;
@@ -181,7 +211,8 @@ export const PATTERNS = {
   },
   permit_phishing: {
     label: 'Has the shape of permit phishing: a signature that lets someone take tokens, with the warnings above',
-    fits: (r) => ['permit', 'permit2'].includes(r.kind) && evidence(r),
+    // A signed transfer (EIP-3009) lets someone take tokens too.
+    fits: (r) => ['permit', 'permit2', 'authorization'].includes(r.kind) && evidence(r),
   },
   collection_approval_phishing: {
     label: 'Has the shape of collection approval phishing: access to every item in a collection, with the warnings above',
@@ -215,8 +246,16 @@ const KNOWN = (pattern) => pattern !== 'no_known_pattern' && pattern !== 'cannot
 
 const PERMISSIONS = ['approve', 'permitTransfer', 'permit2Batch'];
 const LASTING = (r) => partsOf(r).some((p) => ['approve', 'approveAll'].includes(sub(p).action) || (sub(p).action === 'permit2Batch' && !sub(p).once));
+// approve(spender, 0) that may be a revoke or a permission for item #0.
+const itemZero = (p) => Boolean(sub(p).itemZero);
+// A permission with an amount (not one that may be only a revoke, nor one
+// for a single item of a collection: an NFT permit).
+const amounts = (r) => partsOf(r).some((p) => PERMISSIONS.includes(sub(p).action) && !itemZero(p) && !sub(p).item);
 
-const personal = (r) => partsOf(r).some((p) => (p.facts || []).some((f) => f.note === 'personal wallet'));
+// A personal wallet that would be given a permission: a part that may be a
+// revoke does not count (a permission held by a drainer's wallet is the one
+// people most often revoke).
+const personal = (r) => partsOf(r).some((p) => !itemZero(p) && (p.facts || []).some((f) => f.note === 'personal wallet'));
 
 // Things to check, for the deeper analysis. The model picks two or three;
 // each must be about something this request has. Some are shown by code
@@ -234,7 +273,7 @@ export const CHECKS = {
   },
   is_the_amount_needed: {
     text: 'Ask whether it needs more than the amount you mean to spend now.',
-    fits: (r) => has(r, ...PERMISSIONS),
+    fits: amounts,
   },
   is_the_token_real: {
     text: 'Check that the token is the real one: its contract address should be the official one on this network.',
@@ -247,7 +286,7 @@ export const CHECKS = {
   },
   how_long_it_is_valid: {
     text: 'Note how long the signature stays valid: whoever holds it can use it until then.',
-    fits: (r) => r.kind === 'permit' || r.kind === 'permit2',
+    fits: (r) => ['permit', 'permit2', 'authorization'].includes(r.kind),
   },
   check_the_recipient: {
     text: 'Compare the recipient’s address, character by character, with the address you meant to pay.',
@@ -260,12 +299,12 @@ export const CHECKS = {
   },
   which_permission: {
     text: 'Check that this is the permission you meant to remove.',
-    fits: (r) => has(r, 'revoke', 'revokeAll'),
+    fits: (r) => has(r, 'revoke', 'revokeAll') || partsOf(r).some(itemZero),
   },
   compare_the_sites: {
     text: 'Compare the site named in the message, letter by letter, with the site in your address bar.',
     fits: (r) => r.kind === 'signIn',
-    must: (r) => r.kind === 'signIn' && Boolean(sub(r).mismatch),
+    must: (r) => r.kind === 'signIn' && Boolean(sub(r).mismatch || sub(r).unknownSite),
   },
   read_the_whole_text: {
     text: 'Read the whole message before you sign it: sign only what you agree with.',
@@ -351,10 +390,20 @@ export function checkReading(answer, result, { shown = null, deep = false } = {}
   const a = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
   if (!decoded) return { match: false, mismatches: [{ field: PLAIN.action, said: 'an answer', decoded: 'nothing' }], top: [] };
   const mismatches = [];
-  for (const name of ['action', 'who_gains', 'direction', 'limit']) {
-    const said = typeof a[name] === 'string' ? a[name] : '';
-    if (!decoded[name].includes(said)) {
-      mismatches.push({ field: PLAIN[name], said: words(said || 'nothing'), decoded: words(decoded[name][0]) });
+  const said = (name) => (typeof a[name] === 'string' ? a[name] : '');
+  for (const name of FIELDS) {
+    if (!decoded[name].includes(said(name))) {
+      mismatches.push({ field: PLAIN[name], said: words(said(name) || 'nothing'), decoded: words(decoded[name][0]) });
+    }
+  }
+  // Where either of two readings is right, the answer must be one of them
+  // whole, not a field of each: compared with the one its action names.
+  if (mismatches.length === 0 && decoded.either && !decoded.either.some((r) => FIELDS.every((name) => r[name].includes(said(name))))) {
+    const closest = decoded.either.find((r) => r.action.includes(said('action'))) || decoded.either[0];
+    for (const name of FIELDS) {
+      if (!closest[name].includes(said(name))) {
+        mismatches.push({ field: PLAIN[name], said: words(said(name)), decoded: words(closest[name][0]) });
+      }
     }
   }
   if (deep) {

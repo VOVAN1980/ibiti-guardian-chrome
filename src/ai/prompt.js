@@ -75,8 +75,27 @@ function reasonLines(result, options) {
  * One exact sentence on what confirming does: who would be allowed to do
  * what, how much, of which token, for how long. Written by code from the
  * analyzer's result and shown first in the window, whatever the AI does.
+ * "This same wallet" only ever means the account the request itself names
+ * (the analyzer's toSelf), never an account the page reported.
  */
 export function meaning(result, host) {
+  const s = result.subject || {};
+  const sentence = whatConfirmingDoes(result, host);
+  if (!sentence) return sentence;
+  return [
+    sentence,
+    // Celo: the network fee in a token.
+    s.feeToken ? `The network fee is paid in the token ${s.feeToken}.` : null,
+    // eth_signTransaction: nothing is sent now, the site sends it when it likes.
+    s.signOnly ? 'You only sign it now: the site can send it whenever it chooses.' : null,
+    // A meta-transaction: whoever holds the signature has the contract do it.
+    s.metaTx ? 'You only sign it now: whoever holds the signature can have the contract do this for you, at any time.' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function whatConfirmingDoes(result, host) {
   const s = result.subject || {};
   const note = (label) => (result.facts.find((f) => f.label === label) || {}).note;
   // An unverified token names itself: its symbol is the token's own words.
@@ -88,6 +107,14 @@ export function meaning(result, host) {
 
   switch (s.action) {
     case 'approve': {
+      if (s.itemZero) {
+        return `If you confirm and this contract is a token, the spending permission for ${symbolOf(s.token)} is set to zero; if it is an NFT collection, ${who(s.spenderName, 'Spender')} can take your item #0.${coins}`;
+      }
+      // An NFT permit: one item of a collection.
+      if (s.item) {
+        const collection = s.collection ? `the collection ${s.collection}` : 'this collection';
+        return `If you confirm, ${who(s.spenderName, 'Spender')} can take your item #${s.item} of ${collection} from your wallet, whenever it wants, without asking you, until you revoke it.`;
+      }
       const what = s.unlimited ? `any amount of ${symbolOf(s.token)}` : `up to ${s.amount}${s.more ? ' more' : ''}`;
       const lasts = s.lasts || 'until you revoke it';
       const when = /^only\b/.test(lasts) ? lasts : `whenever it wants, without asking you, ${lasts}`;
@@ -112,9 +139,21 @@ export function meaning(result, host) {
       return s.coins
         ? `If you confirm, an existing permission is removed, and ${s.coins} is sent to the contract ${s.contract}.`
         : 'If you confirm, an existing permission is removed. Nothing leaves your wallet.';
+    case 'noChange':
+      return `If you confirm, no permission changes: the spender can still move whatever it could before. Nothing is removed.${coins}`;
     case 'transfer':
     case 'nativeTransfer':
-      if (s.empty) return `If you confirm, an empty transaction is sent to ${s.to}: no coins move, only the network fee is paid.`;
+      if (s.authorization) {
+        const by = s.byRecipient ? 'by the recipient' : 'by whoever holds this signature';
+        return s.fromSelf === false
+          ? `If you sign, you sign a transfer of ${s.amount} from ${s.from}, which is not this wallet: it can be carried out only with a signature of that address.`
+          : `If you sign, ${s.amount} can be moved out of your wallet to ${s.to}, once, ${by}, until the signature expires.`;
+      }
+      if (s.empty) {
+        // A fee the site set itself, when it is more than a small payment.
+        const fee = s.fee ? `, up to ${s.fee} as the site set it` : '';
+        return `If you confirm, an empty transaction is sent to ${s.to}: no coins move, only the network fee is paid${fee}.`;
+      }
       if (s.fromSelf === false) {
         return `If you confirm, ${s.amount} moves from ${s.from}, which is not this wallet, to ${s.to}${s.toSelf ? ', an address of this wallet' : ''}. This works only if ${s.from} has allowed this wallet to move its tokens.${coins}`;
       }
@@ -122,14 +161,24 @@ export function meaning(result, host) {
       return `If you confirm, ${s.amount} leaves your wallet and goes to ${s.to}.${coins}`;
     case 'signIn': {
       const domain = quoted(s.domain, 60);
+      if (s.unknownSite) return `If you confirm, you sign in to ${domain}. Guardian cannot tell which site is asking.`;
       return s.mismatch
         ? `If you confirm, you sign a sign-in message for ${domain}, but the request comes from ${host}, a different site.`
         : `If you confirm, you sign in to ${domain}. Nothing leaves your wallet.`;
     }
     case 'marketOrder':
-      return 'If you confirm, you sign a marketplace order. Whoever holds this signature can complete the trade it describes, including taking the items you offer.';
+      return s.bulk
+        ? 'If you confirm, you sign several marketplace orders at once. Whoever holds this signature can complete them, including taking the items they offer, and Guardian cannot show which items.'
+        : 'If you confirm, you sign a marketplace order. Whoever holds this signature can complete the trade it describes, including taking the items you offer.';
+    case 'delegation':
+      return 'If you confirm, contract code gets control of your account: it could move everything you hold, now or later.';
+    case 'malformed':
+      return 'If you confirm, your wallet gets a transaction Guardian cannot read: it may do something other than what it seems.';
     case 'batch':
-      return `If you confirm, all ${actions.length} actions listed below are carried out with this one confirmation.`;
+      // Coins sent by more than one action: their sum.
+      return `If you confirm, ${actions.length === 1 ? 'the action listed below is' : `all ${actions.length} actions listed below are`} carried out with this one confirmation.${
+        s.total ? ` Together, they send ${s.total} out of your wallet.` : ''
+      }`;
     case 'signMessage':
       return s.readable === false
         ? 'If you confirm, you sign data that cannot be read.'
@@ -150,10 +199,11 @@ const RISK_WORDS = {
 /**
  * The risk level, as a line of the prompt. For a payment measured against
  * the user's balance, the level itself says how much of it the payment
- * takes: then it is not sent to the cloud.
+ * takes (and whether the level is there at all would too, if only some
+ * levels were left out): then it is not sent to the cloud.
  */
 function assessment(result, cloud) {
-  if (cloud && result.subject && result.subject.shareOfBalance) return null;
+  if (cloud && result.subject && (result.subject.shareOfBalance || result.subject.measured)) return null;
   return `Assessment (decided by code, do not change it): ${RISK_WORDS[result.risk]}`;
 }
 

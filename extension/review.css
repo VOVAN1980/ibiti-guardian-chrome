@@ -143,6 +143,11 @@ main {
   word-break: break-all;
 }
 
+/* A site with no web address of its own: words, not a host name. */
+.origin strong[data-unknown] {
+  word-break: normal;
+}
+
 h1 {
   margin: 0;
   font-size: 22px;
@@ -538,12 +543,42 @@ details.sent pre {
   word-break: break-word;
 }
 
+/* A message too long to show whole: says how much is shown. */
+.message-cut {
+  margin: 6px 0 0;
+  color: var(--caution);
+  font-size: 12.5px;
+}
+
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 
 footer {
+  position: relative;
   padding: 12px 16px 12px;
   border-top: 1px solid var(--line);
   background: var(--surface);
+}
+
+/* A press on Continue that did not count (src/review.js): said just above
+   the buttons, over the content, so the buttons never move. */
+.again {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(100% + 8px);
+}
+
+.again span {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .actions {
@@ -600,6 +635,52 @@ button:disabled {
   cursor: default;
 }
 
+/* Continue comes alive a moment after the window is shown and in focus
+   (src/review.js): a thin line fills along its bottom while it waits. */
+#allow {
+  position: relative;
+  overflow: hidden;
+}
+
+#allow[data-arming]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.7;
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #allow[data-arming]::after {
+    animation: arm var(--arm, 0.8s) linear both;
+  }
+}
+
+@keyframes arm {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Something in the request could not be shown: Continue stays off. */
+.render-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--caution-line);
+  background: var(--caution-bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .hold {
   display: flex;
   align-items: center;
@@ -608,6 +689,17 @@ button:disabled {
   margin: 10px 0 0;
   font-size: 12px;
   color: var(--text-2);
+}
+
+/* The stop for Tab after Continue (review.html): a ring only from the keyboard. */
+.hold:focus {
+  outline: none;
+}
+
+.hold:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ── The button pressed against what the request does ──────────────────── */

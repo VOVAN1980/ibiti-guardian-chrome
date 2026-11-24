@@ -8,13 +8,13 @@ export const CHAINS = {
   42161: { name: 'Arbitrum', native: 'ETH' },
   8453: { name: 'Base', native: 'ETH' },
   10: { name: 'Optimism', native: 'ETH' },
-  11155111: { name: 'Sepolia testnet', native: 'ETH' },
-  17000: { name: 'Holesky testnet', native: 'ETH' },
-  97: { name: 'BNB Chain testnet', native: 'tBNB' },
-  80002: { name: 'Polygon Amoy testnet', native: 'POL' },
-  421614: { name: 'Arbitrum Sepolia testnet', native: 'ETH' },
-  84532: { name: 'Base Sepolia testnet', native: 'ETH' },
-  11155420: { name: 'Optimism Sepolia testnet', native: 'ETH' },
+  11155111: { name: 'Sepolia testnet', native: 'ETH', testnet: true },
+  17000: { name: 'Holesky testnet', native: 'ETH', testnet: true },
+  97: { name: 'BNB Chain testnet', native: 'tBNB', testnet: true },
+  80002: { name: 'Polygon Amoy testnet', native: 'POL', testnet: true },
+  421614: { name: 'Arbitrum Sepolia testnet', native: 'ETH', testnet: true },
+  84532: { name: 'Base Sepolia testnet', native: 'ETH', testnet: true },
+  11155420: { name: 'Optimism Sepolia testnet', native: 'ETH', testnet: true },
 };
 
 const token = (symbol, name, decimals) => ({ symbol, name, decimals });

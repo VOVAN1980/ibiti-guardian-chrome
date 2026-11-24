@@ -10,8 +10,9 @@
 
 import { ownAddresses } from '../analyzer/index.js';
 
-// Requests the analyzer could not decode.
-export const UNDECODED = new Set(['contractCall', 'typedData', 'unknown', 'blindSign', 'deploy']);
+// Requests the analyzer could not decode: a transaction not in the standard
+// form, or one that hands the account to contract code, too.
+export const UNDECODED = new Set(['contractCall', 'typedData', 'unknown', 'blindSign', 'deploy', 'malformed', 'delegation']);
 
 export const isUndecoded = (result) =>
   UNDECODED.has(result.kind) ||
@@ -21,12 +22,21 @@ export const isUndecoded = (result) =>
 
 // ── The user's own address ──────────────────────────────────────────────────
 
-/** Removes the user's own address from text that may leave the computer. */
+/**
+ * Removes the user's addresses from text that may leave the computer. `own`
+ * as ownAddresses() gives it: the account that sends or signs the request
+ * (a string) is "your own wallet"; an account only the page reported
+ * ({ address, reported: true }) is hidden too, but never called the user's
+ * own: a page can report any address, the recipient's among them.
+ */
 export function scrubAddresses(text, own) {
   let out = String(text);
-  for (const a of own) {
-    if (!/^0x[0-9a-fA-F]{40}$/.test(a)) continue;
-    out = out.replace(new RegExp(a, 'gi'), '(your own wallet)').replace(new RegExp(a.slice(2), 'gi'), '(your own wallet)');
+  for (const entry of own) {
+    const reported = Boolean(entry) && typeof entry === 'object';
+    const a = reported ? entry.address : entry;
+    if (typeof a !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(a)) continue;
+    const label = reported ? '(a hidden address)' : '(your own wallet)';
+    out = out.replace(new RegExp(a, 'gi'), label).replace(new RegExp(a.slice(2), 'gi'), label);
   }
   return out;
 }

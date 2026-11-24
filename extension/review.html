@@ -32,6 +32,10 @@
         </div>
         <h1 id="headline">Checking the request…</h1>
         <p class="ai-text" id="local-text"></p>
+        <p class="render-note" id="render-note" role="alert" hidden>
+          Guardian could not display all details of this request, so Continue is off. Reject it; the site can ask
+          again.
+        </p>
       </section>
 
       <section class="ai" id="local" tabindex="-1" aria-live="polite">
@@ -78,6 +82,8 @@
       <section class="message" id="message" hidden>
         <h2>Message to sign</h2>
         <pre id="message-text"></pre>
+        <!-- Only for a message too long to show whole (src/review.js). -->
+        <p class="message-cut" id="message-cut" hidden></p>
       </section>
 
       <section class="ai cloud" id="cloud" tabindex="-1">
@@ -114,9 +120,15 @@
     <footer>
       <div class="actions">
         <button id="reject" type="button">Reject</button>
-        <button id="allow" type="button">Continue anyway</button>
+        <!-- Off until the request is on screen and the window has been in
+             focus for a moment (src/review.js). -->
+        <button id="allow" type="button" disabled>Continue anyway</button>
       </div>
-      <p class="hold">
+      <!-- Says when a press on Continue did not count (src/review.js). -->
+      <div class="again" id="again" role="status"></div>
+      <!-- A stop for Tab after Continue: one Shift+Tab from a fresh window
+           lands here, never on Continue. -->
+      <p class="hold" tabindex="0">
         <span class="held" aria-hidden="true"></span>
         Held by Guardian. Your wallet has not seen this request.
       </p>

@@ -98,6 +98,17 @@ await step('a dangerous approve is held and described before the wallet sees it'
 await step('Continue forwards the request to the wallet unchanged', async () => {
   const { review } = await openReview('claim');
   assert.equal(await walletLog(), 0);
+  // What Guardian's window was given to show.
+  const shown = await review.evaluate(async () => {
+    const key = `review:${new URLSearchParams(location.search).get('id')}`;
+    const record = (await chrome.storage.session.get(key))[key];
+    return { method: record.method, params: record.params };
+  });
+  // Continue comes alive a moment after the window appears and is in focus
+  // (test/review.mjs). Headless Chrome can give a new window its focus
+  // seconds late: the window is taken as in focus, as the user's own is.
+  await review.emulateFocusedPage(true);
+  await review.waitForFunction(() => !document.getElementById('allow').disabled, { timeout: 10000 });
   await review.click('#allow');
   await waitForHistory(2);
   const last = await dappLast();
@@ -109,6 +120,8 @@ await step('Continue forwards the request to the wallet unchanged', async () => 
   }));
   // Same method, same recipient, same amount, same calldata: byte for byte.
   assert.deepEqual(received, sent);
+  // And exactly what the window showed.
+  assert.deepEqual(received, shown);
 });
 
 await step('closing the review window counts as Reject', async () => {
@@ -203,7 +216,7 @@ await step('cloud analysis runs only after the user asks for it', async () => {
       patternNote: document.getElementById('cloud-pattern-note').hidden ? '' : document.getElementById('cloud-pattern-note').textContent,
       reading: document.body.dataset.cloudReading,
     }));
-    assert.equal(cloud.state, 'done');
+    assert.equal(cloud.state, 'done', `the cloud answered: ${cloudError}`);
     assert.match(cloud.chip, /^Cloud · \d/);
     // A dangerous approval to a personal wallet: the model's reading must
     // match the decoder, and the pattern it names must be approval phishing.
@@ -295,7 +308,7 @@ await step('hybrid: once allowed, a computer without Gemini Nano gets the explan
       withheld: `${document.body.dataset.withheld || ''} [${document.body.dataset.withheldDetail || ''}]`,
       reading: document.body.dataset.reading,
     }));
-    assert.equal(out.local, 'done', 'the explanation arrived');
+    assert.equal(out.local, 'done', `the explanation arrived: ${out.chip} | ${out.note} | ${out.text.slice(0, 160)}`);
     assert.equal(out.source, 'in_cloud', 'the SDK fell back to the cloud');
     assert.match(out.chip, /^Cloud fallback · \d/);
     assert.match(out.text, /^If you confirm, an unknown personal wallet can take any amount of USDT/);
@@ -490,10 +503,14 @@ await step('hybrid: if Gemini Nano vanishes at the last moment, only the cloud-s
 
   try {
     await first.review.waitForFunction(() => document.body.dataset.local !== undefined);
-    assert.match(
-      await first.review.evaluate(() => document.getElementById('facts').textContent),
-      /of your ETH/,
-      'the window itself shows the share of the balance',
+    // Guardian has the balance (the window names a share only from 25% up).
+    assert.equal(
+      await first.review.evaluate(async () => {
+        const key = `review:${new URLSearchParams(location.search).get('id')}`;
+        return (await chrome.storage.session.get(key))[key].enrich.balance;
+      }),
+      '0x1bc16d674ec80000',
+      'Guardian read the balance it must keep back',
     );
     await setFallback(true);
 
@@ -1056,18 +1073,24 @@ for (const mode of ['unreachable', 'over quota', 'silent', 'timed out']) {
 
       // The facts and both buttons are there before any AI answer.
       await tab.waitForFunction(() => document.getElementById('badge') && document.getElementById('badge').textContent !== '');
+      // In focus, as the user's own window is: Continue waits for the focus,
+      // and headless Chrome can give it seconds late.
+      await tab.emulateFocusedPage(true);
       const early = await tab.evaluate(() => ({
         badge: document.getElementById('badge').textContent,
         headline: document.getElementById('headline').textContent,
         facts: document.querySelectorAll('.fact').length,
         reasons: document.querySelectorAll('#local-top li, #reasons li').length,
         reject: !document.getElementById('reject').disabled,
-        allow: !document.getElementById('allow').disabled,
+        // Continue comes alive a moment after the window appears (test/review.mjs).
+        allow: !document.getElementById('allow').disabled || document.body.dataset.continue === 'arming',
       }));
       assert.deepEqual(
         { ...early, facts: early.facts >= 4, reasons: early.reasons >= 1 },
         { badge: 'High risk', headline: 'Unlimited spending permission for USDT', facts: true, reasons: true, reject: true, allow: true },
       );
+      // ...without waiting for any AI answer.
+      await tab.waitForFunction(() => !document.getElementById('allow').disabled, { timeout: 10000 });
 
       if (mode === 'silent') {
         // No answer yet and none coming: Reject works at once.

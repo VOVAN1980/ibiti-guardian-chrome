@@ -47,6 +47,7 @@ let own = [];
 async function decide(decision) {
   if (decided) return;
   decided = true;
+  disarm();
   $('reject').disabled = true;
   $('allow').disabled = true;
   try {
@@ -56,12 +57,159 @@ async function decide(decision) {
   }
 }
 
-function hostOf(origin) {
-  try {
-    return new URL(origin).host;
-  } catch {
-    return origin;
+// ── Continue waits a moment ─────────────────────────────────────────────────
+// The window opens focused, at a spot a page can work out. A page that keeps
+// the user clicking fast there ("click to verify", "tap as fast as you can")
+// could land a click on Continue. So Continue comes alive only once the
+// window has been on screen and in focus for a moment, and again after every
+// focus change, like the browser's own permission prompts. Then a click,
+// Enter or Space counts only after a pause in clicking and pressing keys: a
+// run of fast clicks or key presses never does. Reject and Escape work at
+// once.
+const ARM_MS = 800;
+// The pause before the deciding press, about a double-click's interval.
+const PAUSE_MS = 500;
+let canArm = false; // the request is on screen in full
+let armed = false;
+let armedAt = Infinity; // performance.now() when Continue came alive
+let pressedAt = -Infinity; // the latest press in this window: a pointer or a key
+let pressedBefore = -Infinity; // the press before it
+let keyHeld = false; // the latest key press repeats a key held down
+let byKey = false; // a key event is being handled: a click now is that key's
+let armTimer = null;
+
+// The preview is a frame inside the demo page, which owns that frame anyway:
+// there only the delay applies, not the focus.
+const inFocus = () => document.visibilityState === 'visible' && (isPreview || document.hasFocus());
+
+function disarm() {
+  clearTimeout(armTimer);
+  armTimer = null;
+  armed = false;
+  armedAt = Infinity;
+  const allow = $('allow');
+  allow.disabled = true;
+  delete allow.dataset.arming;
+  document.body.dataset.continue = 'off'; // tests and logs only
+  hideAgain();
+}
+
+// A press on a live Continue that did not count: the window says so for a
+// moment, just above the buttons and over the content, so they never move.
+// The box is a live region: a screen reader hears it once per showing.
+const AGAIN = 'Continue counts a press only after a short pause. Press it again to confirm.';
+let againTimer = null;
+function hideAgain() {
+  clearTimeout(againTimer);
+  $('again').replaceChildren();
+}
+function notCounted() {
+  clearTimeout(againTimer);
+  if (!$('again').firstChild) {
+    const note = document.createElement('span');
+    note.textContent = AGAIN;
+    $('again').replaceChildren(note);
   }
+  againTimer = setTimeout(hideAgain, 4000);
+}
+
+/** Starts (or restarts) the wait; Continue comes alive at its end. */
+function arm() {
+  disarm();
+  if (!canArm || decided || !inFocus()) return;
+  const allow = $('allow');
+  allow.style.setProperty('--arm', `${ARM_MS}ms`);
+  allow.dataset.arming = '';
+  document.body.dataset.continue = 'arming';
+  armTimer = setTimeout(() => {
+    armTimer = null;
+    if (!canArm || decided || !inFocus()) return;
+    armed = true;
+    armedAt = performance.now();
+    delete allow.dataset.arming;
+    allow.disabled = false;
+    document.body.dataset.continue = 'on';
+  }, ARM_MS);
+}
+
+/**
+ * Whether a click on a live Continue is the user's decision: its press began
+ * after Continue came alive, and a pause after the press before it, whether
+ * that was a click, a tap or a key. A mouse click or a tap (detail above 0)
+ * is measured from its pointer press; Enter or Space on a focused Continue
+ * from the key's own press, and a key held down never counts. A click that
+ * no pointer or key in this window made (a screen reader pressing the button
+ * for the user) counts after a pause since the last press.
+ */
+function deliberate(event) {
+  const paused = pressedAt >= armedAt && pressedAt - pressedBefore >= PAUSE_MS;
+  if (event.detail > 0) return paused;
+  if (byKey) return !keyHeld && paused;
+  return !keyHeld && performance.now() - pressedAt >= PAUSE_MS;
+}
+
+function wireContinue() {
+  // On the window, in the capture phase: it also gets the presses on
+  // Continue while it is off (a disabled button gets no mousedown or click,
+  // but the window still gets the pointerdown), so it sees the whole run.
+  const press = () => {
+    pressedBefore = pressedAt;
+    pressedAt = performance.now();
+  };
+  window.addEventListener('pointerdown', press, true);
+  // Every key press counts too; the repeats of a key held down do not.
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      keyHeld = event.repeat;
+      if (!event.repeat) press();
+    },
+    true,
+  );
+  // A key's click comes while that key's event is handled (Enter's with its
+  // keypress, Space's with its keyup), before the next task.
+  for (const type of ['keydown', 'keypress', 'keyup']) {
+    window.addEventListener(
+      type,
+      () => {
+        byKey = true;
+        setTimeout(() => (byKey = false));
+      },
+      true,
+    );
+  }
+  $('allow').addEventListener('click', (event) => {
+    if (!armed) return;
+    if (deliberate(event)) decide('allow');
+    else notCounted();
+  });
+  if (!isPreview) {
+    window.addEventListener('focus', arm);
+    window.addEventListener('blur', disarm);
+  }
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? arm() : disarm()));
+}
+
+// A sandboxed or hidden frame has no address of its own: its origin is "null".
+const UNKNOWN_SITE = 'A site Guardian cannot identify';
+
+/** The site as the window's header names it, or null when it has no web address. */
+function siteOf(origin) {
+  try {
+    const url = new URL(origin);
+    if ((url.protocol === 'https:' || url.protocol === 'http:') && url.host) return url.host;
+  } catch {
+    // not an address
+  }
+  return null;
+}
+
+/** Writes the site at the top of the window: "<site> wants your wallet to confirm". */
+function showSite(origin) {
+  const site = siteOf(origin);
+  $('origin').textContent = site || UNKNOWN_SITE;
+  if (site) delete $('origin').dataset.unknown;
+  else $('origin').dataset.unknown = '';
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -82,10 +230,16 @@ function addressButton(address) {
   return button;
 }
 
+// A text message to sign is shown whole, up to a length no honest one
+// reaches; a longer one is cut there, and the window says so.
+const MESSAGE_SHOWN = 100000;
+const grouped = (n) => n.toLocaleString('en-US');
+
+/** Draws the request. Returns false when part of it could not be shown. */
 function render(record, result) {
   document.body.dataset.risk = result.risk;
   $('badge').textContent = BADGE[result.risk];
-  $('origin').textContent = hostOf(record.origin);
+  showSite(record.origin);
   $('headline').textContent = result.headline;
   showPromise(result);
 
@@ -120,8 +274,14 @@ function render(record, result) {
   // The warnings at the top, the other reasons under "Also worth knowing".
   showImportant(result, [], '');
 
+  // The whole message: the box scrolls.
+  let whole = true;
   if (typeof result.message === 'string') {
-    $('message-text').textContent = result.message.slice(0, 4000);
+    const text = result.message;
+    whole = text.length <= MESSAGE_SHOWN;
+    $('message-text').textContent = whole ? text : text.slice(0, MESSAGE_SHOWN);
+    $('message-cut').textContent = whole ? '' : `Guardian shows the first ${grouped(MESSAGE_SHOWN)} of ${grouped(text.length)} characters.`;
+    $('message-cut').hidden = whole;
     $('message').hidden = false;
   }
 
@@ -133,6 +293,7 @@ function render(record, result) {
   $('reject').classList.toggle('primary', safeIsReject);
   $('allow').classList.toggle('primary', !safeIsReject);
   $('allow').textContent = safeIsReject ? 'Continue anyway' : 'Continue to wallet';
+  return whole;
 }
 
 // ── Short explanation: what confirming does and the warnings, written by
@@ -786,33 +947,106 @@ function wireCloud(result, host) {
   });
 }
 
+/**
+ * The user's own address(es) in this request, kept out of anything that may
+ * go to the cloud. Only the account that sends or signs the request is the
+ * user's own. Accounts the page reported (eth_accounts) can be any address,
+ * the recipient's among them: hidden too, never called the user's own.
+ */
+function ownOf(record) {
+  const signers = new Set(
+    ownAddresses({ ...record, enrich: undefined })
+      .filter((a) => typeof a === 'string')
+      .map((a) => a.toLowerCase()),
+  );
+  return ownAddresses(record).map((entry) => {
+    const address = typeof entry === 'string' ? entry : entry && entry.address;
+    return typeof address === 'string' && signers.has(address.toLowerCase()) ? address : { address, reported: true };
+  });
+}
+
+/**
+ * Something in this request could not be shown. Reject works as ever;
+ * Continue stays off, since the user cannot see all of what it would confirm.
+ */
+function couldNotDisplay(error, record) {
+  console.warn('[Guardian] could not display the request', error);
+  canArm = false;
+  disarm();
+  document.body.dataset.render = 'failed';
+  // Never calmer than "Check carefully", whatever was drawn before it failed.
+  if (document.body.dataset.risk !== 'danger') {
+    document.body.dataset.risk = 'caution';
+    $('badge').textContent = BADGE.caution;
+  }
+  if ($('promise-verdict').dataset.state === 'none') $('promise-verdict').hidden = true;
+  if (!$('origin').textContent) showSite(record && record.origin);
+  if ($('headline').textContent === 'Checking the request…') $('headline').textContent = 'Guardian could not display this request';
+  $('render-note').hidden = false;
+  $('local').hidden = true;
+  $('cloud').hidden = true;
+  $('reject').classList.add('primary');
+  $('allow').classList.remove('primary');
+  $('allow').textContent = 'Continue anyway';
+}
+
 async function main() {
   if (isPreview) document.body.dataset.host = 'preview';
-  const record = await loadReview(id);
+  // Reject first: whatever happens below, the user can always refuse.
+  $('reject').addEventListener('click', () => decide('reject'));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') decide('reject');
+  });
+  wireContinue();
+  disarm();
+
+  let record;
+  try {
+    record = await loadReview(id);
+  } catch (error) {
+    couldNotDisplay(error);
+    return;
+  }
   if (!record) {
     $('headline').textContent = 'This request is no longer waiting';
     $('local').hidden = true;
     $('cloud').hidden = true;
     $('allow').hidden = true;
     $('reject').textContent = 'Close';
-    $('reject').addEventListener('click', () => decide('reject'));
     return;
   }
 
-  const result = analyze(record);
-  const host = hostOf(record.origin);
-  own = ownAddresses(record);
-  chainId = typeof record.chainId === 'number' ? record.chainId : null;
-  render(record, result);
+  let result;
+  let host;
+  try {
+    result = analyze(record);
+    // The site as the sentences and the prompts name it: never "null" or "".
+    host = siteOf(record.origin) || 'a site Guardian cannot identify';
+    own = ownOf(record);
+    chainId = typeof record.chainId === 'number' ? record.chainId : null;
+    const whole = render(record, result);
+    // The sentence on what confirming does, at once (runLocal writes the same).
+    $('local-text').textContent = codeSentence(result, meaning(result, host));
+    // A message cut short: the user cannot read all of what they would sign.
+    if (!whole) throw new Error(`the message is longer than ${grouped(MESSAGE_SHOWN)} characters`);
+  } catch (error) {
+    couldNotDisplay(error, record);
+    return;
+  }
+  canArm = true;
+  arm();
 
-  $('reject').addEventListener('click', () => decide('reject'));
-  $('allow').addEventListener('click', () => decide('allow'));
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') decide('reject');
+  // The AI parts: if one fails, the facts, the warnings and both buttons stand.
+  try {
+    wireCloud(result, host);
+  } catch (error) {
+    $('cloud').hidden = true;
+    console.warn('[Guardian] cloud analysis unavailable', error);
+  }
+  runLocal(result, host).catch((error) => {
+    noAi('No AI for this request');
+    console.warn('[Guardian] explanation unavailable', error);
   });
-
-  wireCloud(result, host);
-  runLocal(result, host);
 }
 
 main();

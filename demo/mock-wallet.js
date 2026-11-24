@@ -80,6 +80,11 @@
   // is free, or when a test asks for it with ?mock=1. Either way it introduces
   // itself through EIP-6963 below, which is how the demo site finds it.
   const query = new URLSearchParams(location.search);
+  const swapMode = query.get('swap');
+  // With ?swap=stub the wallet starts with a request() that never answers (it
+  // is not set up yet) and puts its working one in place a moment later.
+  const working = provider.request;
+  if (swapMode === 'stub') provider.request = () => new Promise(() => {});
   if (query.has('mock') || !window.ethereum) {
     try {
       window.ethereum = provider;
@@ -91,7 +96,6 @@
   // Some real wallets replace request() after start-up. With ?swap=1 the demo
   // wallet does the same, both by assignment and by redefining the property,
   // to prove that Guardian keeps guarding the new function.
-  const swapMode = query.get('swap');
   if (swapMode) {
     setTimeout(() => {
       const inner = provider.request;
@@ -99,7 +103,9 @@
         window.__mockWalletSwapped = true;
         return inner.call(provider, args);
       };
-      if (swapMode === 'define') {
+      if (swapMode === 'stub') {
+        provider.request = working;
+      } else if (swapMode === 'define') {
         Object.defineProperty(provider, 'request', { value: replacement, writable: true, configurable: true });
       } else if (swapMode === 'rebind') {
         // Reads the method (already Guardian's wrapper) and assigns it back bound.

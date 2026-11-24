@@ -188,6 +188,8 @@ await step('a dangerous approve is held and described before the wallet sees it'
 
 await step('Continue forwards the request to the wallet unchanged', async () => {
   const frame = await openReview('#claim');
+  // Continue comes alive a moment after the window appears (test/review.mjs).
+  await until(frame, () => !document.getElementById('allow').disabled);
   await frame.click('#allow');
   await panelGone();
   await until(page, () => window.__dapp.history.length === 2);
@@ -233,11 +235,18 @@ for (const [scenario, expected] of Object.entries(expectations)) {
       reasons: document.querySelectorAll('#promise-verdict[data-state="clash"] .sr-only, #local-top li, #reasons li').length,
       overflow: document.documentElement.scrollWidth - innerWidth,
     }));
-    assert.equal(shown.badge, expected.risk);
-    assert.equal(shown.headline, expected.headline);
-    assert.ok(shown.facts >= 2, `facts shown: ${shown.facts}`);
-    if (expected.risk === 'High risk') assert.ok(shown.reasons >= 1, 'a dangerous request says why');
-    assert.ok(shown.overflow <= 0, `review window scrolls sideways by ${shown.overflow}px`);
+    try {
+      assert.equal(shown.badge, expected.risk);
+      assert.equal(shown.headline, expected.headline);
+      assert.ok(shown.facts >= 2, `facts shown: ${shown.facts}`);
+      if (expected.risk === 'High risk') assert.ok(shown.reasons >= 1, 'a dangerous request says why');
+      assert.ok(shown.overflow <= 0, `review window scrolls sideways by ${shown.overflow}px`);
+    } catch (error) {
+      // Close the panel anyway, so the next scenario starts clean.
+      await frame.click('#reject').catch(() => {});
+      await panelGone().catch(() => {});
+      throw error;
+    }
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${PHONE ? 'phone' : 'desktop'}-${scenario}.png`) });
     await frame.click('#reject');
     await panelGone();

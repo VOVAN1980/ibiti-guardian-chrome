@@ -48,7 +48,9 @@ export function wordToBigInt(w) {
 export function toBigInt(value) {
   if (typeof value === 'bigint') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
-  if (typeof value === 'string' && value.length > 0) {
+  // No real amount, time or balance is longer than this (a uint256 has 78
+  // digits): anything longer is not a number Guardian reads.
+  if (typeof value === 'string' && value.length > 0 && value.length <= 80) {
     try {
       return BigInt(value);
     } catch {
@@ -58,13 +60,35 @@ export function toBigInt(value) {
   return null;
 }
 
+/**
+ * A whole number in a request, as every wallet reads it the same way: a
+ * non-negative safe integer, a plain decimal string or a 0x-hex string,
+ * below 2^bits. Null for anything else.
+ */
+export function uintOf(value, bits = 256) {
+  let n = null;
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) n = BigInt(value);
+  else if (typeof value === 'string' && /^(?:0x[0-9a-fA-F]{1,64}|\d{1,78})$/.test(value)) n = BigInt(value);
+  return n !== null && n < 1n << BigInt(bits) ? n : null;
+}
+
+/** "1234567" → "1,234,567", in one pass (a regex here was slow on long numbers). */
+function groupThousands(digits) {
+  const sign = digits.startsWith('-') ? '-' : '';
+  const s = sign ? digits.slice(1) : digits;
+  const head = s.length % 3 || 3;
+  const parts = [s.slice(0, head)];
+  for (let i = head; i < s.length; i += 3) parts.push(s.slice(i, i + 3));
+  return sign + parts.join(',');
+}
+
 /** "1234.5" style decimal string from base units. Trims trailing zeros. */
 export function formatUnits(amount, decimals) {
   const d = BigInt(decimals);
   const base = 10n ** d;
   const whole = amount / base;
   const frac = amount % base;
-  const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const wholeStr = groupThousands(whole.toString());
   if (frac === 0n) return wholeStr;
   const fracStr = frac.toString().padStart(Number(d), '0').replace(/0+$/, '');
   return `${wholeStr}.${fracStr.slice(0, 6)}`;
